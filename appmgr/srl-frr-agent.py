@@ -107,7 +107,7 @@ def Handle_Notification(obj, state):
 
                 if net_inst in state.network_instances:
                     lines = ""
-                    for name,peer_as in state.network_instances[ net_inst ].interfaces.items():
+                    for name,peer_as in state.network_instances[ net_inst ]['interfaces'].items():
                         lines += f'neighbor {name} interface remote-as {peer_as}\n'
                     params[ "bgp_neighbor_lines"] = lines
                 else:
@@ -136,10 +136,10 @@ def Handle_Notification(obj, state):
             if net_inst in state.network_instances:
                 ni = state.network_instances[ net_inst ]
                 if peer_as is not None:
-                   ni.interfaces[ intf ] = peer_as
+                   ni['interfaces'][ intf ] = peer_as
                    cmd = f"neighbor {intf} interface remote-as {peer_as}"
                 else:
-                   ni.interfaces.pop( intf, default=None )
+                   ni['interfaces'].pop( intf, default=None )
                    cmd = f"no neighbor {intf}"
                 if ni['admin_state']=='enable':
                    run_vtysh( ns=net_inst, asn=ni['autonomous_system'], cmd=cmd )
