@@ -1,0 +1,17 @@
+# See example_config.yml for an explanation of all the accepted fields
+srl-frr-agent:
+   path: /etc/opt/srlinux/appmgr/
+   launch-command: /etc/opt/srlinux/appmgr/srl-frr-agent.sh
+   search-command: python3 /etc/opt/srlinux/appmgr/srl-frr-agent.py
+   wait-for-config: Yes
+   failure-threshold: 100
+   failure-action: wait=forever
+   author: 'Nokia'
+   version-command: ' cat build_version'
+   yang-modules:
+       names:
+           - "srl-frr-agent"
+       source-directories:
+           - "/etc/opt/srlinux/appmgr/"
+           - "/opt/srlinux/models/srl_nokia/models/common/"
+           - "/opt/srlinux/models/srl_nokia/models/network-instance/"

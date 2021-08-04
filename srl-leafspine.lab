@@ -1,0 +1,16 @@
+name: srl-unnumbered
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # Uses custom container image containing FRR agent
+      image: srl/unnumbered:latest
+
+  nodes:
+    leaf1:  { kind: srl, group: leaves, startup-config: leaf1.cfg.json }
+    spine1: { kind: srl, group: spines, startup-config: spine1.cfg.json }
+
+  links:
+    - endpoints: ["leaf1:e1-1","spine1:e1-1"]

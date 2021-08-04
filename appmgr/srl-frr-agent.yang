@@ -1,0 +1,57 @@
+module srl-frr-agent {
+
+    yang-version "1";
+
+    namespace "urn:srl_nokia/frr";
+
+    prefix "srl_nokia-frr";
+
+    import srl_nokia-common {
+        prefix srl_nokia-comm;
+    }
+    import srl_nokia-network-instance {
+        prefix srl_nokia-netinst;
+    }
+    import srl_nokia-extensions {
+        prefix srl_nokia-ext;
+    }
+
+    revision "2021-08-03" {
+        description "Initial revision";
+        reference "TBD";
+    }
+
+    grouping frr-top {
+        description "Configure FRR";
+
+        container frr {
+            presence "presence container";
+            description "FRR configuration under a network-instance";
+
+            leaf admin-state {
+                type srl_nokia-comm:admin-state;
+                default "enable";
+
+                description
+                    "Administratively enable or disable the entire FRR BGP instance
+
+                    Disable causes all BGP sessions to be taken down immediately, even if admin-state at the group or neighbor level of some of these sessions is still set as enable.";
+            }
+            leaf oper-state {
+                config false;
+                type enumeration {
+                    enum "up" {
+                        description "Operational state of FRR BGP is up.";
+                    }
+                    enum "down" {
+                        description "Operational state of FRR BGP is down.";
+                    }
+                }
+            }
+        }
+    }
+
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
+        uses frr-top;
+    }
+}
