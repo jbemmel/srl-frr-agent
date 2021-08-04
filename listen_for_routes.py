@@ -9,7 +9,7 @@ from pyroute2 import IPDB
 from pyroute2 import NetNS
 
 work_queue = queue.Queue()
-ip = IPDB(nl=NetNS('srbase-frr'))
+ip = IPDB(nl=NetNS('srbase-default'))
 
 class Worker(threading.Thread):
     def run(self):
@@ -33,7 +33,7 @@ def callback(ipdb, msg, action):
     if action == 'RTM_NEWLINK' or action == 'RTM_DELLINK':
         work_queue.put(msg)
     else:
-        print( f"\nSkipping event:{action}" )
+        print( f"\nSkipping event:{action} msg={msg}" )
     
     # Skipping event:RTM_NEWNEIGH (ARP? Can learn MAC from this?)
     # Skipping event:RTM_DELROUTE (when taking down lo0.0 on peer)
