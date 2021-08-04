@@ -25,7 +25,7 @@ module srl-frr-agent {
         description "Configure FRR";
 
         container frr {
-            presence "presence container";
+            presence "Configure FRR BGP";
             description "FRR configuration under a network-instance";
 
             leaf admin-state {
@@ -37,6 +37,34 @@ module srl-frr-agent {
 
                     Disable causes all BGP sessions to be taken down immediately, even if admin-state at the group or neighbor level of some of these sessions is still set as enable.";
             }
+            leaf autonomous-system {
+                type uint32 {
+                  range "1..4294967295";
+                }
+                mandatory "true";
+                description
+                    "The global AS number of the BGP instance
+
+                    Values greater than 65535 must be entered in ASPLAIN format.";
+            }
+            leaf local-preference {
+                type uint32;
+                default 100;
+                description
+                    "The value of the local-preference attribute that is added to received routes from EBGP peers
+
+                    It is also used to encode the local preference attribute for locally generated BGP routes.";
+            }
+            leaf router-id {
+                //type srl_nokia-comm:dotted-quad;
+                type srl_nokia-comm:ip-address;
+                mandatory "true";
+                description
+                    "The BGP identifier used by this BGP instance in all of its OPEN messages
+
+                    Any non-zero value is supported.";
+            }
+
             leaf oper-state {
                 config false;
                 type enumeration {
@@ -54,4 +82,17 @@ module srl-frr-agent {
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
         uses frr-top;
     }
+
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:interface" { // list
+        // TODO only in ip-vrfs, not mac-vrfs
+        leaf bgp-unnumbered {
+          description "Initiate a BGP unnumbered peering session on this interface, default False";
+          type boolean;
+          default false;
+        }
+    }
+
+    // TODO extend network-instance/interface with flags to
+    // 1. Establish BGP unnumbered peering
+    // 2. Export the interface IP to peers (?) or simply all connected
 }

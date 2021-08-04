@@ -13,6 +13,7 @@ import json
 import signal
 import traceback
 import subprocess
+import pwd
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
@@ -81,7 +82,7 @@ def Subscribe_Notifications(stream_id):
 def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
-        if agent_name in obj.config.key.js_path:
+        if obj.config.key.js_path == ".network_instance.protocols.frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             if obj.config.op == 2:
@@ -92,13 +93,18 @@ def Handle_Notification(obj, state):
                 logging.info( f'Handle_Config: Unregister response:: {response}' )
                 state = State() # Reset state, works?
             else:
+                params = { "network_instance" : obj.config.key.keys[0] } # e.g. "default"
+
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
                 if 'admin_state' in data:
-                    state.admin_state = data['admin_state']
-                    logging.info(f"Got admin_state :: {state.admin_state}")
-
-                return not state.role is None
+                    params[ "admin_state" ] = data['admin_state'][12:]
+                if 'autonomous_system' in data:
+                    params[ "autonomous_system" ] = data['autonomous_system']['value']
+                if 'router_id' in data:
+                    params[ "router_id" ] = data['router_id']['value']
+                script_update_frr(**params)
+                return True
 
         # TODO process
     else:
@@ -174,20 +180,23 @@ def Update_Flapcounts(state,now,peer_ip,status,flapmap,period_mins):
 ###########################
 # Invokes gnmic client to update router configuration, via bash script
 ###########################
-def script_update_config(some_param):
-    logging.info(f'Calling update script: some_param={some_param}' )
+def script_update_frr(**kwargs):
+    logging.info(f'Calling manage-frr script: params={kwargs}' )
+
     try:
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/script-to-be-built.sh',
-                                       some_param ],
+       my_env = {**os.environ, **kwargs}
+       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/manage-frr.sh'],
+                                       # preexec_fn=demote(frr_uid, frr_gid),
+                                       env=my_env, # shell=False
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
-       logging.info(f'script_update_config result: {stdoutput} err={stderroutput}')
+       logging.info(f'manage-frr result: {stdoutput} err={stderroutput}')
     except Exception as e:
-       logging.error(f'Exception caught in script_update_config :: {e}')
+       logging.error(f'Exception caught in script_update_frr :: {e}')
 
 class State(object):
     def __init__(self):
-        self.role = None       # May not be set in config
+        self.admin_state = None       # May not be set in config
 
         # TODO more properties
 
@@ -219,7 +228,6 @@ def Run():
 
     state = State()
     count = 1
-    lldp_subscribed = False
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
@@ -228,10 +236,7 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info('TO DO -commit.end config')
                 else:
-                    if Handle_Notification(obj, state) and not lldp_subscribed:
-                       Subscribe(stream_id, 'lldp')
-                       Subscribe(stream_id, 'route')
-                       lldp_subscribed = True
+                    Handle_Notification(obj, state)
 
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
