@@ -109,7 +109,7 @@ module srl-frr-agent {
                        or a number between 1..4294967295";
           type peer-as-spec;
 
-          must "../srl_nokia-netinst:protocols/experimental-frr" {
+          must "../../srl_nokia-netinst:protocols/experimental-frr" {
             error-message "BGP unnumbered requires experimental-frr to be configured for this network-instance";
           }
           must "../type != 'srl_nokia-netinst:mac-vrf'" {
@@ -117,6 +117,10 @@ module srl-frr-agent {
           }
           must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if:type != 'srl_nokia-if:bridged'" {
             error-message "BGP unnumbered interfaces cannot have type 'bridged'";
+          }
+          must "not(starts-with(../srl_nokia-if:name, 'mgmt') or starts-with(../srl_nokia-if:name, 'lo') 
+                or starts-with(../srl_nokia-if:name, 'system'))" {
+            error-message "BGP unnumbered cannot be configured for this type of interface";
           }
           must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv6" {
             error-message "BGP unnumbered interfaces must have ipv6 enabled";

@@ -82,19 +82,20 @@ def Subscribe_Notifications(stream_id):
 def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
+        net_inst = obj.config.key.keys[0] # e.g. "default"
         if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
+            params = { "network_instance" : net_inst }
             if obj.config.op == 2:
                 logging.info(f"Delete config scenario")
-                # if file_name != None:
-                #    Update_Result(file_name, action='delete')
-                response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-                logging.info( f'Handle_Config: Unregister response:: {response}' )
-                state = State() # Reset state, works?
+                # TODO if this is the last namespace, unregister?
+                # response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
+                # logging.info( f'Handle_Config: Unregister response:: {response}' )
+                # state = State() # Reset state, works?
+                params[ "admin_state" ] = "disable" # Only stop service for this namespace
+                state.network_instances.pop( net_inst, default=None )
             else:
-                params = { "network_instance" : obj.config.key.keys[0] } # e.g. "default"
-
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
                 if 'admin_state' in data:
@@ -103,37 +104,47 @@ def Handle_Notification(obj, state):
                     params[ "autonomous_system" ] = data['autonomous_system']['value']
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
-                params[ "peer_as" ] = "external" # TODO change logic
-                script_update_frr(**params)
-                return True
+
+                if net_inst in state.network_instances:
+                    lines = ""
+                    for name,peer_as in state.network_instances[ net_inst ].interfaces.items():
+                        lines += f'neighbor {name} interface remote-as {peer_as}\n'
+                    params[ "bgp_neighbor_lines"] = lines
+                else:
+                    state.network_instances[ net_inst ] = { **params, "interfaces" : {} }
+
+            script_update_frr(**params)
+            return True
 
         # Tends to come first (always?) when full blob is configured
         elif obj.config.key.js_path == ".network_instance.interface":
             json_acceptable_string = obj.config.data.json.replace("'", "\"")
             data = json.loads(json_acceptable_string)
 
-            # 'interface' can be missing
+            # 'interface' only present when bgp-unnumbered param is set
+            peer_as = None
             if 'interface' in data:
-               intf = data['interface']
-               # TODO handle deletion events too
-               if 'bgp_unnumbered_peer_as_enum' in intf:
-                  # 'external' or 'internal'
-                  peer_as = intf['bgp_unnumbered_peer_as_enum'][13:]
-               elif 'bgp_unnumbered_peer_as_uint32' in intf:
-                  peer_as = intf['bgp_unnumbered_peer_as_uint32']['value']
-               else:
-                  peer_as = '?'
-               logging.info( f"TODO: Configure peer-as={peer_as}" )
-               # TODO lookup AS for this ns, check if enabled
-               asn = 65000
-               ns = obj.config.key.keys[0]
-               intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
-               # TODO multiple commands and/or set peer-as here too?
-               cmd = f"{'no ' if not val else ''}neighbor {intf} interface peer-group V4"
-               # XXX assumes daemon is running
-               run_vtysh( ns=ns, asn=asn, cmd=cmd )
+               _i = data['interface']
+               if 'bgp_unnumbered_peer_as_enum' in _i:
+                  # 'external' or 'internal', remove 'BGP_UNNUMBERED_PEER_AS_ENUM_'
+                  peer_as = _i['bgp_unnumbered_peer_as_enum'][28:]
+               elif 'bgp_unnumbered_peer_as_uint32' in _i:
+                  peer_as = _i['bgp_unnumbered_peer_as_uint32']['value']
 
-        # TODO process
+            intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
+            # lookup AS for this ns, check if enabled (i.e. daemon running)
+            if net_inst in state.network_instances:
+                ni = state.network_instances[ net_inst ]
+                if peer_as is not None:
+                   ni.interfaces[ intf ] = peer_as
+                   cmd = f"neighbor {intf} interface remote-as {peer-as}"
+                else:
+                   ni.interfaces.pop( intf, default=None )
+                   cmd = f"no neighbor {intf}"
+                if ni['admin_state']=='enable':
+                   run_vtysh( ns=net_inst, asn=ni['autonomous_system'], cmd=cmd )
+            elif peer_as is not None:
+                state.network_instances[ net_inst ] = { "interfaces" : { intf : peer_as } }
     else:
         logging.info(f"Unexpected notification : {obj}")
 
@@ -238,7 +249,7 @@ def run_vtysh(ns,asn,cmd):
 class State(object):
     def __init__(self):
         self.admin_state = None       # May not be set in config
-
+        self.network_instances = {}   # Indexed by name
         # TODO more properties
 
     def __str__(self):
