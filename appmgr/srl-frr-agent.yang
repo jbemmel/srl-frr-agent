@@ -64,6 +64,14 @@ module srl-frr-agent {
 
                     Any non-zero value is supported.";
             }
+            // Could do union between enum and uint32 too
+            leaf peer-as {
+                type string;
+                description
+                    "The BGP peer AS, 'external' or 'internal' for auto-discovery
+                     or a number between 1..4294967295";
+                default "external";
+            }
 
             leaf oper-state {
                 config false;

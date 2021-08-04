@@ -103,6 +103,8 @@ def Handle_Notification(obj, state):
                     params[ "autonomous_system" ] = data['autonomous_system']['value']
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
+                if 'peer_as' in data:
+                    params[ "peer_as" ] = data['peer_as']['value']
 
                 script_update_frr(**params)
                 return True
@@ -111,12 +113,12 @@ def Handle_Notification(obj, state):
             data = json.loads(json_acceptable_string)
             val = data['interface']['bgp_unnumbered']['value']
             # TODO lookup AS for this ns, check if enabled
-            as = 65000
+            asn = 65000
             ns = obj.config.key.keys[0]
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             cmd = f"{'no ' if not val else ''}neighbor {intf} interface peer-group V4"
             # XXX assumes daemon is running
-            run_vtysh( ns=ns, as=as, cmd=cmd )
+            run_vtysh( ns=ns, asn=asn, cmd=cmd )
 
         # TODO process
     else:
@@ -206,17 +208,19 @@ def script_update_frr(**kwargs):
     except Exception as e:
        logging.error(f'Exception caught in script_update_frr :: {e}')
 
-def run_vtysh(ns,as,cmd):
+def run_vtysh(ns,asn,cmd):
     logging.info(f'Calling vtysh: ns={ns} cmd={cmd}' )
     try:
        vtysh_proc = subprocess.Popen(
          ['/usr/bin/sudo', '/usr/bin/vtysh',
           '--vty_socket', f'/var/run/frr/srbase-{ns}/',
           '-c', 'configure terminal',
-          '-c', f'router bgp {as}', '-c', cmd ],
+          '-c', f'router bgp {asn}', '-c', cmd ],
          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = vtysh_proc.communicate()
        logging.info(f'vtysh result: {stdoutput} err={stderroutput}')
+    except Exception as e:
+       logging.error(f'Exception caught in run_vtysh :: {e}')
 
 class State(object):
     def __init__(self):
