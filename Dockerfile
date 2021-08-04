@@ -8,6 +8,7 @@ RUN curl https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm -o /t
     sudo yum install -y /tmp/repo.rpm && \
     sudo yum install -y frr frr-pythontools && \
     sudo sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons && \
+    sudo chmod 644 /etc/frr/daemons && \
     rm -f /tmp/repo.rpm
 
 RUN sudo mkdir -p /etc/opt/srlinux/appmgr/
