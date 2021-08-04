@@ -137,7 +137,7 @@ def Handle_Notification(obj, state):
                 ni = state.network_instances[ net_inst ]
                 if peer_as is not None:
                    ni.interfaces[ intf ] = peer_as
-                   cmd = f"neighbor {intf} interface remote-as {peer-as}"
+                   cmd = f"neighbor {intf} interface remote-as {peer_as}"
                 else:
                    ni.interfaces.pop( intf, default=None )
                    cmd = f"no neighbor {intf}"
