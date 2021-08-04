@@ -82,7 +82,7 @@ def Subscribe_Notifications(stream_id):
 def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
-        if obj.config.key.js_path == ".network_instance.protocols.frr":
+        if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             if obj.config.op == 2:
@@ -103,22 +103,35 @@ def Handle_Notification(obj, state):
                     params[ "autonomous_system" ] = data['autonomous_system']['value']
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
-                if 'peer_as' in data:
-                    params[ "peer_as" ] = data['peer_as']['value']
-
+                params[ "peer_as" ] = "external" # TODO change logic
                 script_update_frr(**params)
                 return True
+
+        # Tends to come first (always?) when full blob is configured
         elif obj.config.key.js_path == ".network_instance.interface":
             json_acceptable_string = obj.config.data.json.replace("'", "\"")
             data = json.loads(json_acceptable_string)
-            val = data['interface']['bgp_unnumbered']['value']
-            # TODO lookup AS for this ns, check if enabled
-            asn = 65000
-            ns = obj.config.key.keys[0]
-            intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
-            cmd = f"{'no ' if not val else ''}neighbor {intf} interface peer-group V4"
-            # XXX assumes daemon is running
-            run_vtysh( ns=ns, asn=asn, cmd=cmd )
+
+            # 'interface' can be missing
+            if 'interface' in data:
+               intf = data['interface']
+               # TODO handle deletion events too
+               if 'bgp_unnumbered_peer_as_enum' in intf:
+                  # 'external' or 'internal'
+                  peer_as = intf['bgp_unnumbered_peer_as_enum'][13:]
+               elif 'bgp_unnumbered_peer_as_uint32' in intf:
+                  peer_as = intf['bgp_unnumbered_peer_as_uint32']['value']
+               else:
+                  peer_as = '?'
+               logging.info( f"TODO: Configure peer-as={peer_as}" )
+               # TODO lookup AS for this ns, check if enabled
+               asn = 65000
+               ns = obj.config.key.keys[0]
+               intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
+               # TODO multiple commands and/or set peer-as here too?
+               cmd = f"{'no ' if not val else ''}neighbor {intf} interface peer-group V4"
+               # XXX assumes daemon is running
+               run_vtysh( ns=ns, asn=asn, cmd=cmd )
 
         # TODO process
     else:

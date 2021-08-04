@@ -12,6 +12,12 @@ module srl-frr-agent {
     import srl_nokia-network-instance {
         prefix srl_nokia-netinst;
     }
+    import srl_nokia-interfaces {
+        prefix srl_nokia-if;
+    }
+    import srl_nokia-if-ip {
+        prefix srl_nokia-if-ip;
+    }
     import srl_nokia-extensions {
         prefix srl_nokia-ext;
     }
@@ -21,12 +27,24 @@ module srl-frr-agent {
         reference "TBD";
     }
 
+    typedef peer-as-spec {
+      type union {
+        type uint32 { range "1..4294967295"; }
+        type enumeration { enum "external"; enum "internal"; }
+      }
+    }
+
     grouping frr-top {
         description "Configure FRR";
 
-        container frr {
+        container experimental-frr {
             presence "Configure FRR BGP";
-            description "FRR configuration under a network-instance";
+            must "../../type != 'srl_nokia-netinst:mac-vrf'" {
+              error-message "FRR configuration is not supported on network-instance of type mac-vrf";
+            }
+            must "not(../bgp)" {
+              error-message "Either BGP or FRR can be configured for a network-instance, not both";
+            }
 
             leaf admin-state {
                 type srl_nokia-comm:admin-state;
@@ -64,14 +82,6 @@ module srl-frr-agent {
 
                     Any non-zero value is supported.";
             }
-            // Could do union between enum and uint32 too
-            leaf peer-as {
-                type string;
-                description
-                    "The BGP peer AS, 'external' or 'internal' for auto-discovery
-                     or a number between 1..4294967295";
-                default "external";
-            }
 
             leaf oper-state {
                 config false;
@@ -92,12 +102,26 @@ module srl-frr-agent {
     }
 
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:interface" { // list
-        // TODO only in ip-vrfs, not mac-vrfs
-        leaf bgp-unnumbered {
-          description "Initiate a BGP unnumbered peering session on this interface, default False";
-          type boolean;
-          default false;
-        }
+
+      leaf bgp-unnumbered-peer-as {
+          description "Initiate a BGP unnumbered peering session on this interface,
+                       expecting the given peer AS: 'external' or 'internal' for auto-discovery
+                       or a number between 1..4294967295";
+          type peer-as-spec;
+
+          must "../srl_nokia-netinst:protocols/experimental-frr" {
+            error-message "BGP unnumbered requires experimental-frr to be configured for this network-instance";
+          }
+          must "../type != 'srl_nokia-netinst:mac-vrf'" {
+            error-message "BGP unnumbered is not supported on network-instance of type mac-vrf";
+          }
+          must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if:type != 'srl_nokia-if:bridged'" {
+            error-message "BGP unnumbered interfaces cannot have type 'bridged'";
+          }
+          must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv6" {
+            error-message "BGP unnumbered interfaces must have ipv6 enabled";
+          }
+       }
     }
 
     // TODO extend network-instance/interface with flags to
