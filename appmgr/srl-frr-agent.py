@@ -3,6 +3,7 @@
 
 import grpc
 import datetime
+import time
 import sys
 import logging
 import socket
@@ -75,6 +76,27 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
 
+def ipv6_2_mac(ipv6):
+    # remove subnet info if given
+    subnetIndex = ipv6.find("/")
+    if subnetIndex != -1:
+        ipv6 = ipv6[:subnetIndex]
+
+    ipv6Parts = ipv6.split(":")
+    macParts = []
+    for ipv6Part in ipv6Parts[-4:]:
+        while len(ipv6Part) < 4:
+            ipv6Part = "0" + ipv6Part
+        macParts.append(ipv6Part[:2])
+        macParts.append(ipv6Part[-2:])
+
+    # modify parts to match MAC value
+    macParts[0] = "%02x" % (int(macParts[0], 16) ^ 2)
+    del macParts[4]
+    del macParts[3]
+
+    return ":".join(macParts)
+
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
 ## At present processing config from js_path containing agent_name
@@ -94,7 +116,7 @@ def Handle_Notification(obj, state):
                 # logging.info( f'Handle_Config: Unregister response:: {response}' )
                 # state = State() # Reset state, works?
                 params[ "admin_state" ] = "disable" # Only stop service for this namespace
-                state.network_instances.pop( net_inst, default=None )
+                state.network_instances.pop( net_inst, None )
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
@@ -108,7 +130,8 @@ def Handle_Notification(obj, state):
                 if net_inst in state.network_instances:
                     lines = ""
                     for name,peer_as in state.network_instances[ net_inst ]['interfaces'].items():
-                        lines += f'neighbor {name} interface remote-as {peer_as}\n'
+                        # Add single indent space at end
+                        lines += f'neighbor {name} interface remote-as {peer_as}\n '
                     params[ "bgp_neighbor_lines"] = lines
                 else:
                     state.network_instances[ net_inst ] = { **params, "interfaces" : {} }
@@ -139,10 +162,24 @@ def Handle_Notification(obj, state):
                    ni['interfaces'][ intf ] = peer_as
                    cmd = f"neighbor {intf} interface remote-as {peer_as}"
                 else:
-                   ni['interfaces'].pop( intf, default=None )
+                   ni['interfaces'].pop( intf, None )
                    cmd = f"no neighbor {intf}"
                 if ni['admin_state']=='enable':
-                   run_vtysh( ns=net_inst, asn=ni['autonomous_system'], cmd=cmd )
+                   # TODO add 'interface {intf} ipv6 nd suppress-ra'? doesn't work
+                   run_vtysh( ns=net_inst, asn=ni['autonomous_system'], config=[cmd] )
+
+                   # Wait a few seconds, then retrieve the peer's router-id and AS
+                   # TODO start separate thread or use scheduler?
+                   time.sleep(3)
+                   _get_peer = f'show bgp neighbors {intf} json'
+                   json_data = run_vtysh( ns=net_inst, show=[_get_peer] )
+                   if json_data:
+                       _peer = json.loads( json_data )
+                       with _peer[ intf ] as i:
+                           logging.info( f"{i.bgpNeighborAddr} MAC={ipv6_2_mac(i.bgpNeighborAddr)}" )
+                           logging.info( f"localAs={i.localAs} remoteAs={i.remoteAs}" )
+                           logging.info( f"id={i.remoteRouterId} name={i.hostname}" )
+                           # dont have the MAC address, but can derive it
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = { "interfaces" : { intf : peer_as } }
     else:
@@ -150,6 +187,34 @@ def Handle_Notification(obj, state):
 
     # dont subscribe to LLDP now
     return False
+
+#
+# Test: adding a link local nexthop 169.254.0.1 via the NDK
+#
+def TestAddLinkLocal_Nexthop_Group(name,nh_ip,net_inst='default'):
+
+    import nexthop_group_service_pb2
+    import nexthop_group_service_pb2_grpc
+
+    nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
+    #if action =='replace':
+    #    nhg_stub.SyncStart(request=sdk_common_pb2.SyncRequest(),metadata=metadata)
+    nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
+    nhg_info = nh_request.group_info.add()
+    nhg_info.key.network_instance_name = net_inst
+    nhg_info.key.name = name + '_sdk' # Must end with '_sdk'
+    nh = nhg_info.data.next_hop.add()
+    ip = ipaddress.ip_address(nh_ip) # Like Zebra creates
+    nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT # or INDIRECT or LOCAL
+    nh.ip_nexthop.addr = ip.packed
+
+    logging.info(f"NH_REQUEST :: {nh_request}")
+    nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
+    logging.info(f"NH RESPONSE:: {nhg_response}")
+    logging.info(f"NHG status:{nhg_response.status}")
+    logging.info(f"NHG error:{nhg_response.error_str}")
+
+    return nhg_response.status == 0
 
 ##
 # Update agent state flapcounts for BFD
@@ -232,17 +297,19 @@ def script_update_frr(**kwargs):
     except Exception as e:
        logging.error(f'Exception caught in script_update_frr :: {e}')
 
-def run_vtysh(ns,asn,cmd):
-    logging.info(f'Calling vtysh: ns={ns} cmd={cmd}' )
+def run_vtysh(ns,asn=0,show=[],config=[]):
+    logging.info(f'Calling vtysh: ns={ns} show={show} config={config}' )
     try:
-       vtysh_proc = subprocess.Popen(
-         ['/usr/bin/sudo', '/usr/bin/vtysh',
-          '--vty_socket', f'/var/run/frr/srbase-{ns}/',
-          '-c', 'configure terminal',
-          '-c', f'router bgp {asn}', '-c', cmd ],
-         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+       args = ['/usr/bin/sudo', '/usr/bin/vtysh',
+               '--vty_socket', f'/var/run/frr/srbase-{ns}/']
+       if config!=[]:
+          args += [ '-c', 'configure terminal', '-c', f'router bgp {asn}' ]
+       args += sum( [ [ "-c", x ] for x in config ], [] )
+       args += sum( [ [ "-c", x ] for x in show   ], [] )
+       vtysh_proc = subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
        stdoutput, stderroutput = vtysh_proc.communicate()
        logging.info(f'vtysh result: {stdoutput} err={stderroutput}')
+       return stdoutput
     except Exception as e:
        logging.error(f'Exception caught in run_vtysh :: {e}')
 
@@ -267,6 +334,9 @@ def Run():
     # optional agent_liveliness=<seconds> to have system kill unresponsive agents
     response = stub.AgentRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
     logging.info(f"Registration response : {response.status}")
+
+    TestAddLinkLocal_Nexthop_Group('link_local','169.254.0.1')
+    TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
 
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)

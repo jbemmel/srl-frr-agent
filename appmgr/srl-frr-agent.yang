@@ -118,9 +118,13 @@ module srl-frr-agent {
           must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if:type != 'srl_nokia-if:bridged'" {
             error-message "BGP unnumbered interfaces cannot have type 'bridged'";
           }
-          must "not(starts-with(../srl_nokia-if:name, 'mgmt') or starts-with(../srl_nokia-if:name, 'lo') 
+          must "not(starts-with(../srl_nokia-if:name, 'mgmt') or starts-with(../srl_nokia-if:name, 'lo')
                 or starts-with(../srl_nokia-if:name, 'system'))" {
             error-message "BGP unnumbered cannot be configured for this type of interface";
+          }
+          // For the auto-provisioned IPv4 data path
+          must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv4" {
+            error-message "BGP unnumbered interfaces must have ipv4 enabled";
           }
           must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv6" {
             error-message "BGP unnumbered interfaces must have ipv6 enabled";
