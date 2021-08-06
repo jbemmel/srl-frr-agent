@@ -34,7 +34,11 @@ def callback(ipdb, msg, action):
         work_queue.put(msg)
     else:
         print( f"\nSkipping event:{action} msg={msg}" )
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> d7b4f12d610dbeb1aa253f89a37d72ee96af7187
     # Skipping event:RTM_NEWNEIGH (ARP? Can learn MAC from this?)
     # Skipping event:RTM_DELROUTE (when taking down lo0.0 on peer)
     # Skipping event:RTM_NEWROUTE
