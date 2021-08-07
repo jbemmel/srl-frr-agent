@@ -133,13 +133,13 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac ):
 def MonitorInterfaces( peer ):
    logging.info( f"MonitorInterfaces: {peer}")
    try:
-     while peer.ifs != []:
-      for _i in peer.ifs:
+     while peer['ifs'] != []:
+      for _i in peer['ifs']:
          _get_peer = f'show bgp neighbors {_i} json'
-         json_data = run_vtysh( ns=peer.net_inst, show=[_get_peer] )
+         json_data = run_vtysh( ns=peer['net_inst'], show=[_get_peer] )
          if json_data:
              _js = json.loads( json_data )
-             if _i in js:
+             if _i in _js:
                 i = _js[ _i ]
                 neighbor = i['bgpNeighborAddr']
                 if neighbor!="none":
@@ -149,7 +149,7 @@ def MonitorInterfaces( peer ):
                    logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                    logging.info( f"id={i['remoteRouterId']} name={i['hostname'] if 'hostname' in i else '?'}" )
                    ConfigurePeerIPMAC( _i, i['remoteRouterId'], mac )
-                   peer.ifs.remove( _i )
+                   peer['ifs'].remove( _i )
 
       time.sleep(10)
    except Exception as e:
