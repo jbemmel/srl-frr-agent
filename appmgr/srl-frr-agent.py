@@ -53,10 +53,11 @@ metadata = [('agent_name', agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
 # Global gNMI channel, used by multiple threads
+gnmi_options = [('username', 'admin'), ('password', 'admin')]
 gnmi_channel = grpc.insecure_channel(
-   'unix:///opt/srlinux/var/run/sr_gnmi_server',
-   options = [('username', 'admin'), ('password', 'admin')] )
-grpc.channel_ready_future(gnmi_channel).result(timeout=5)
+   'unix:///opt/srlinux/var/run/sr_gnmi_server', options = gnmi_options )
+# Postpone connect
+# grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
 ############################################################
 ## Subscribe to required event
@@ -117,44 +118,70 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac, gnmi_stub ):
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
    config = {
-      "admin-state" : "enable",
-      "ipv4" : {
-         "address" : [
-            { "ip-prefix" : ips[ 0 if peer_ip == ips[1] else 1 ] + "/31",
-              "primary": '[null]'  # type 'empty'
-            },
-         ],
-         "arp" : {
-            "neighbor": [
-              {
-                "ipv4-address": peer_ip,
-                "link-layer-address": mac,
-                "_annotate_link-layer-address": "managed by SRL FRR agent"
-              }
-            ]
-         }
-      }
+     "admin-state" : "enable",
+     "ipv4" : {
+        "address" : [
+           { "ip-prefix" : ips[ 0 if peer_ip == ips[1] else 1 ] + "/31",
+             "primary": '[null]'  # type 'empty'
+           },
+        ],
+        "arp" : {
+           "neighbor": [
+             {
+               "ipv4-address": peer_ip,
+               "link-layer-address": mac,
+               "_annotate_link-layer-address": "managed by SRL FRR agent"
+             }
+           ]
+        }
+     }
    }
+   return gNMI_Set( path, config )
+
+def ConfigureNextHopGroup( net_inst, intf, peer_ip ):
+    path = f'/network-instance[name={net_inst}]/next-hop-groups'
+    config = {
+     "group": [
+      {
+        "name": intf, # Full interface.sub
+        "nexthop": [
+          {
+            "index": 0,
+            "ip-address": peer_ip,
+            "admin-state": "enable"
+          }
+        ]
+      }
+     ]
+    }
+    return gNMI_Set( path, config )
+
+def gNMI_Set(path,data):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
    #                       username="admin",password="admin",
    #                       insecure=True, debug=True) as gnmic:
    #  logging.info( f"Sending gNMI SET: {path} {config} {gnmic}" )
    update_msg = []
    u_path = gnmi_path_generator( path )
-   u_val = json.dumps(config).encode('utf-8')
+   u_val = json.dumps(data).encode('utf-8')
    update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
    update_request = SetRequest( update=update_msg )
    try:
-         gnmi_stub.Set( update_request )
-         logging.info( f"Past gnmi.Set {path}" )
+         # Leaving out 'metadata' does return an error, so the call goes through
+         # It just doesn't show up in CLI (cached), logout+login fixes it
+         res = gnmi_stub.Set( update_request, metadata=gnmi_options )
+         logging.info( f"Past gnmi.Set {path}: {res}" )
+         return res
    except grpc._channel._InactiveRpcError as err:
          logging.error(err)
          # May happen during system startup, retry once
          if err.code() == grpc.StatusCode.FAILED_PRECONDITION:
              logging.info("Exception during startup? Retry in 5s...")
              time.sleep( 5 )
-             gnmi_stub.Set( update_request )
-             logging.info("OK, success")
+             res = gnmi_stub.Set( update_request, metadata=gnmi_options )
+             logging.info(f"OK, success? {res}")
+             return res
+         raise err
 #
 # Runs as a separate thread
 #
@@ -164,6 +191,9 @@ class MonitoringThread(Thread):
        Thread.__init__(self)
        self.net_inst = net_inst
        self.interfaces = interfaces
+
+       # Check that gNMI is connected now
+       grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
    def run(self):
 
@@ -183,11 +213,13 @@ class MonitoringThread(Thread):
                    neighbor = i['bgpNeighborAddr']
                    if neighbor!="none":
                       # dont have the MAC address, but can derive it from ipv6 link local
+                      peer_ip = i['remoteRouterId']
                       mac = ipv6_2_mac(neighbor) if neighbor != 'none' else '?'
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
-                      logging.info( f"id={i['remoteRouterId']} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      ConfigurePeerIPMAC( _i, i['remoteRouterId'], mac, gnmi_stub )
+                      logging.info( f"id={peer_ip} name={i['hostname'] if 'hostname' in i else '?'}" )
+                      ConfigurePeerIPMAC( _i, peer_ip, mac, gnmi_stub )
+                      ConfigureNextHopGroup( self.net_inst, _i, peer_ip )
                       self.interfaces.remove( _i )
 
          time.sleep(10)
