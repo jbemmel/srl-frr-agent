@@ -136,9 +136,9 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac, gnmi_stub ):
         }
      }
    }
-   return gNMI_Set( path, config )
+   return gNMI_Set( gnmi_stub, path, config )
 
-def ConfigureNextHopGroup( net_inst, intf, peer_ip ):
+def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
     path = f'/network-instance[name={net_inst}]/next-hop-groups'
     config = {
      "group": [
@@ -155,9 +155,9 @@ def ConfigureNextHopGroup( net_inst, intf, peer_ip ):
       }
      ]
     }
-    return gNMI_Set( path, config )
+    return gNMI_Set( gnmi_stub, path, config )
 
-def gNMI_Set(path,data):
+def gNMI_Set( gnmi_stub, path, data ):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
    #                       username="admin",password="admin",
    #                       insecure=True, debug=True) as gnmic:
@@ -220,7 +220,7 @@ class MonitoringThread(Thread):
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peer_ip} name={i['hostname'] if 'hostname' in i else '?'}" )
                       ConfigurePeerIPMAC( _i, peer_ip, mac, gnmi_stub )
-                      ConfigureNextHopGroup( self.net_inst, _i, peer_ip )
+                      ConfigureNextHopGroup( self.net_inst, _i, peer_ip, gnmi_stub )
                       self.interfaces.remove( _i )
 
          time.sleep(10)
