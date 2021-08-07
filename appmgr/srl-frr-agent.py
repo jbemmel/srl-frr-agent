@@ -14,7 +14,7 @@ import json
 import signal
 import traceback
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ThreadPoolExecutor
 import pwd
 
 import sdk_service_pb2
@@ -29,7 +29,12 @@ import sdk_common_pb2
 import telemetry_service_pb2
 import telemetry_service_pb2_grpc
 
-from pygnmi.client import gNMIclient, telemetryParser
+# from pygnmi.client import gNMIclient, telemetryParser
+
+# pygnmi does not support multithreading, so we need to build it
+from pygnmi.spec.gnmi_pb2_grpc import gNMIStub
+from pygnmi.spec.gnmi_pb2 import SetRequest, Update, TypedValue
+from pygnmi.path_generator import gnmi_path_generator
 
 from logging.handlers import RotatingFileHandler
 
@@ -46,6 +51,12 @@ agent_name='srl_frr_agent'
 channel = grpc.insecure_channel('127.0.0.1:50053')
 metadata = [('agent_name', agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
+
+# Global gNMI channel, used by multiple threads
+gnmi_channel = grpc.insecure_channel(
+   'unix:///opt/srlinux/var/run/sr_gnmi_server',
+   options = [('username', 'admin'), ('password', 'admin')] )
+grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
 ############################################################
 ## Subscribe to required event
@@ -97,7 +108,7 @@ def ipv6_2_mac(ipv6):
 
     return ":".join(macParts)
 
-def ConfigurePeerIPMAC( intf, peer_ip, mac ):
+def ConfigurePeerIPMAC( intf, peer_ip, mac, gnmi_stub ):
    logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
@@ -124,40 +135,65 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac ):
          }
       }
    }
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                           username="admin",password="admin",
-                           insecure=True, debug=True) as c:
-      logging.info( f"Sending gNMI SET: {path} {config}" )
-      c.set( encoding='json_ietf', update=[(path,config)] )
-
+   #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+   #                       username="admin",password="admin",
+   #                       insecure=True, debug=True) as gnmic:
+   #  logging.info( f"Sending gNMI SET: {path} {config} {gnmic}" )
+   update_msg = []
+   u_path = gnmi_path_generator( path )
+   u_val = json.dumps(config).encode('utf-8')
+   update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
+   update_request = SetRequest( update=update_msg )
+   try:
+         gnmi_stub.Set( update_request )
+         logging.info( f"Past gnmi.Set {path}" )
+   except grpc._channel._InactiveRpcError as err:
+         logging.error(err)
+         # May happen during system startup, retry once
+         if err.code() == grpc.StatusCode.FAILED_PRECONDITION:
+             logging.info("Exception during startup? Retry in 5s...")
+             time.sleep( 5 )
+             gnmi_stub.Set( update_request )
+             logging.info("OK, success")
 #
 # Runs as a separate thread
 #
-def MonitorInterfaces( peer ):
-   logging.info( f"MonitorInterfaces: {peer}")
-   try:
-     while peer['ifs'] != []:
-      for _i in peer['ifs']:
-         _get_peer = f'show bgp neighbors {_i} json'
-         json_data = run_vtysh( ns=peer['net_inst'], show=[_get_peer] )
-         if json_data:
-             _js = json.loads( json_data )
-             if _i in _js:
-                i = _js[ _i ]
-                neighbor = i['bgpNeighborAddr']
-                if neighbor!="none":
-                   # dont have the MAC address, but can derive it from ipv6 link local
-                   mac = ipv6_2_mac(neighbor) if neighbor != 'none' else '?'
-                   logging.info( f"{neighbor} MAC={mac}" )
-                   logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
-                   logging.info( f"id={i['remoteRouterId']} name={i['hostname'] if 'hostname' in i else '?'}" )
-                   ConfigurePeerIPMAC( _i, i['remoteRouterId'], mac )
-                   peer['ifs'].remove( _i )
+from threading import Thread
+class MonitoringThread(Thread):
+   def __init__(self, net_inst, interfaces):
+       Thread.__init__(self)
+       self.net_inst = net_inst
+       self.interfaces = interfaces
 
-      time.sleep(10)
-   except Exception as e:
-      logging.error(e)
-   logging.info( "Done monitoring interfaces" )
+   def run(self):
+
+      # Create per-thread gNMI stub, using a global channel
+      gnmi_stub = gNMIStub( gnmi_channel )
+
+      logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
+      try:
+        while self.interfaces != []:
+         for _i in self.interfaces:
+            _get_peer = f'show bgp neighbors {_i} json'
+            json_data = run_vtysh( ns=self.net_inst, show=[_get_peer] )
+            if json_data:
+                _js = json.loads( json_data )
+                if _i in _js:
+                   i = _js[ _i ]
+                   neighbor = i['bgpNeighborAddr']
+                   if neighbor!="none":
+                      # dont have the MAC address, but can derive it from ipv6 link local
+                      mac = ipv6_2_mac(neighbor) if neighbor != 'none' else '?'
+                      logging.info( f"{neighbor} MAC={mac}" )
+                      logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
+                      logging.info( f"id={i['remoteRouterId']} name={i['hostname'] if 'hostname' in i else '?'}" )
+                      ConfigurePeerIPMAC( _i, i['remoteRouterId'], mac, gnmi_stub )
+                      self.interfaces.remove( _i )
+
+         time.sleep(10)
+      except Exception as e:
+         logging.error(e)
+      logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
 
 ##################################################################
@@ -167,6 +203,10 @@ def MonitorInterfaces( peer ):
 def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
+
+        # Tested on main thread
+        # ConfigurePeerIPMAC( "e1-1.0", "1.2.3.4", "00:11:22:33:44:55" )
+
         net_inst = obj.config.key.keys[0] # e.g. "default"
         if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
@@ -203,8 +243,7 @@ def Handle_Notification(obj, state):
 
             script_update_frr(**params)
             if interfaces!=[] and params[ "admin_state" ] == "enable":
-               executor = ThreadPoolExecutor(max_workers=1)
-               executor.submit( MonitorInterfaces, { "ifs" : interfaces, "net_inst" : net_inst } )
+               MonitoringThread( net_inst, interfaces ).start()
             else:
                logging.info( "interfaces==[] or disabled, not starting monitor thread yet" )
             return True
@@ -242,8 +281,7 @@ def Handle_Notification(obj, state):
                    if peer_as is not None:
                        # XXX Should start 1 thread per network-instance, or even
                        # 1 thread for all instances. This is polling
-                       executor = ThreadPoolExecutor(max_workers=1)
-                       executor.submit( MonitorInterfaces, { "ifs" : [intf], "net_inst" : net_inst } )
+                       MonitoringThread(net_inst,[intf]).start()
 
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = { "interfaces" : { intf : peer_as } }
