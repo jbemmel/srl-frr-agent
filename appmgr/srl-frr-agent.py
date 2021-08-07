@@ -98,6 +98,7 @@ def ipv6_2_mac(ipv6):
     return ":".join(macParts)
 
 def ConfigurePeerIPMAC( intf, peer_ip, mac ):
+   logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
    subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
@@ -109,7 +110,8 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac ):
       "ipv4" : {
          "address" : [
             { "ip-prefix" : ips[ 0 if peer_ip == ips[1] else 1 ] + "/31",
-              "primary" : True },
+              "primary": '[null]'  # type 'empty'
+            },
          ],
          "arp" : {
             "neighbor": [
@@ -124,8 +126,9 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac ):
    }
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                            username="admin",password="admin",
-                           insecure=True, debug=False) as gnmi:
-      gnmi.set( encoding='json_ietf', update=[(path,config)] )
+                           insecure=True, debug=True) as c:
+      logging.info( f"Sending gNMI SET: {path} {config}" )
+      c.set( encoding='json_ietf', update=[(path,config)] )
 
 #
 # Runs as a separate thread
