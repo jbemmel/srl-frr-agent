@@ -148,6 +148,7 @@ def ConfigureNextHopGroup( net_inst, intf, peer_ip ):
           {
             "index": 0,
             "ip-address": peer_ip,
+            "_annotate_ip-address" : "managed by SRL FRR agent",
             "admin-state": "enable"
           }
         ]
