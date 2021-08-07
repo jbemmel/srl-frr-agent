@@ -14,6 +14,7 @@ import json
 import signal
 import traceback
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 import pwd
 
 import sdk_service_pb2
@@ -28,8 +29,7 @@ import sdk_common_pb2
 import telemetry_service_pb2
 import telemetry_service_pb2_grpc
 
-# See opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos/bfd_service_pb2.py
-import bfd_service_pb2
+from pygnmi.client import gNMIclient, telemetryParser
 
 from logging.handlers import RotatingFileHandler
 
@@ -97,6 +97,66 @@ def ipv6_2_mac(ipv6):
 
     return ":".join(macParts)
 
+def ConfigurePeerIPMAC( intf, peer_ip, mac ):
+   phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
+   base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
+   subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
+   ips = list( map( str, subnet.hosts() ) )
+
+   path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
+   config = {
+      "admin-state" : "enable",
+      "ipv4" : {
+         "address" : [
+            { "ip-prefix" : ips[ 0 if peer_ip == ips[1] else 1 ] + "/31",
+              "primary" : True },
+         ],
+         "arp" : {
+            "neighbor": [
+              {
+                "ipv4-address": peer_ip,
+                "link-layer-address": mac,
+                "_annotate_link-layer-address": "managed by SRL FRR agent"
+              }
+            ]
+         }
+      }
+   }
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                           username="admin",password="admin",
+                           insecure=True, debug=False) as gnmi:
+      gnmi.set( encoding='json_ietf', update=[(path,config)] )
+
+#
+# Runs as a separate thread
+#
+def MonitorInterfaces( peer ):
+   logging.info( f"MonitorInterfaces: {peer}")
+   try:
+     while peer.ifs != []:
+      for _i in peer.ifs:
+         _get_peer = f'show bgp neighbors {_i} json'
+         json_data = run_vtysh( ns=peer.net_inst, show=[_get_peer] )
+         if json_data:
+             _js = json.loads( json_data )
+             if _i in js:
+                i = _js[ _i ]
+                neighbor = i['bgpNeighborAddr']
+                if neighbor!="none":
+                   # dont have the MAC address, but can derive it from ipv6 link local
+                   mac = ipv6_2_mac(neighbor) if neighbor != 'none' else '?'
+                   logging.info( f"{neighbor} MAC={mac}" )
+                   logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
+                   logging.info( f"id={i['remoteRouterId']} name={i['hostname'] if 'hostname' in i else '?'}" )
+                   ConfigurePeerIPMAC( _i, i['remoteRouterId'], mac )
+                   peer.ifs.remove( _i )
+
+      time.sleep(10)
+   except Exception as e:
+      logging.error(e)
+   logging.info( "Done monitoring interfaces" )
+
+
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
 ## At present processing config from js_path containing agent_name
@@ -109,6 +169,7 @@ def Handle_Notification(obj, state):
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             params = { "network_instance" : net_inst }
+            interfaces = []
             if obj.config.op == 2:
                 logging.info(f"Delete config scenario")
                 # TODO if this is the last namespace, unregister?
@@ -132,11 +193,17 @@ def Handle_Notification(obj, state):
                     for name,peer_as in state.network_instances[ net_inst ]['interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
+                        interfaces.append( name )
                     params[ "bgp_neighbor_lines"] = lines
                 else:
                     state.network_instances[ net_inst ] = { **params, "interfaces" : {} }
 
             script_update_frr(**params)
+            if interfaces!=[] and params[ "admin_state" ] == "enable":
+               executor = ThreadPoolExecutor(max_workers=1)
+               executor.submit( MonitorInterfaces, { "ifs" : interfaces, "net_inst" : net_inst } )
+            else:
+               logging.info( "interfaces==[] or disabled, not starting monitor thread yet" )
             return True
 
         # Tends to come first (always?) when full blob is configured
@@ -169,17 +236,12 @@ def Handle_Notification(obj, state):
                    run_vtysh( ns=net_inst, asn=ni['autonomous_system'], config=[cmd] )
 
                    # Wait a few seconds, then retrieve the peer's router-id and AS
-                   # TODO start separate thread or use scheduler?
-                   time.sleep(3)
-                   _get_peer = f'show bgp neighbors {intf} json'
-                   json_data = run_vtysh( ns=net_inst, show=[_get_peer] )
-                   if json_data:
-                       _peer = json.loads( json_data )
-                       with _peer[ intf ] as i:
-                           logging.info( f"{i.bgpNeighborAddr} MAC={ipv6_2_mac(i.bgpNeighborAddr)}" )
-                           logging.info( f"localAs={i.localAs} remoteAs={i.remoteAs}" )
-                           logging.info( f"id={i.remoteRouterId} name={i.hostname}" )
-                           # dont have the MAC address, but can derive it
+                   if peer_as is not None:
+                       # XXX Should start 1 thread per network-instance, or even
+                       # 1 thread for all instances. This is polling
+                       executor = ThreadPoolExecutor(max_workers=1)
+                       executor.submit( MonitorInterfaces, { "ifs" : [intf], "net_inst" : net_inst } )
+
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = { "interfaces" : { intf : peer_as } }
     else:
@@ -215,70 +277,6 @@ def TestAddLinkLocal_Nexthop_Group(name,nh_ip,net_inst='default'):
     logging.info(f"NHG error:{nhg_response.error_str}")
 
     return nhg_response.status == 0
-
-##
-# Update agent state flapcounts for BFD
-##
-def Update_BFDFlapcounts(state,peer_ip,status=0):
-    if peer_ip not in state.bfd_flaps:
-       logging.info(f"BFD : initializing flap state for {peer_ip}")
-       state.bfd_flaps[peer_ip] = {}
-    now = datetime.datetime.now()
-    flaps_this_period, history = Update_Flapcounts(state, now, peer_ip, status,
-                                                   state.bfd_flaps,
-                                                   state.flap_period_mins)
-    state_update = {
-      "status" : { "value" : "red" if flaps_this_period > state.flap_threshold or status!=4 else "green" },
-      "flaps_last_period" : flaps_this_period,
-      "flaps_history" : { "value" : history },
-      "last_flap_timestamp" : { "value" : now.strftime("%Y-%m-%d %H:%M:%S") }
-    }
-    Update_Peer_State( peer_ip, 'bfd', state_update )
-    Update_Global_State( state, "total_bfd_flaps_last_period", # Works??
-      sum( [len(f) for f in state.bfd_flaps.values()] ) )
-
-##
-# Update agent state flapcounts for Route entry
-##
-def Update_RouteFlapcounts(state,peer_ip,prefix):
-    if peer_ip not in state.route_flaps:
-       logging.info(f"ROUTE : initializing flap state for {peer_ip}")
-       state.route_flaps[peer_ip] = {}
-    now = datetime.datetime.now()
-    flaps_this_period, history = Update_Flapcounts(state, now, peer_ip, prefix,
-                                                   state.route_flaps,
-                                                   state.flap_period_mins)
-    state_update = {
-      "status" : { "value" : "red" if flaps_this_period > state.flap_threshold else "green" },
-      "flaps_last_period" : flaps_this_period,
-      "flaps_history" : { "value" : history },
-      "last_flap_timestamp" : { "value" : now.strftime("%Y-%m-%d %H:%M:%S") }
-    }
-    Update_Peer_State( peer_ip, 'routes', state_update )
-    # Update_Global_State( state )
-
-##
-# Update agent state flapcounts
-##
-def Update_Flapcounts(state,now,peer_ip,status,flapmap,period_mins):
-    flaps = flapmap[peer_ip]
-    if status != 0:
-       flaps[now] = status
-    keep_flaps = {}
-    keep_history = ""
-    start_of_period = now - datetime.timedelta(minutes=period_mins)
-    _max = state.max_flaps_history
-    for i in sorted(flaps.keys(), reverse=True):
-       logging.info(f"BFD : check if {i} is within the last period {start_of_period}")
-       if ( i > start_of_period and (_max==0 or _max>len(keep_flaps)) ):
-           keep_flaps[i] = flaps[i]
-           keep_history += f'{ i.strftime("[%H:%M:%S.%f]") } ~ {flaps[i]},'
-       else:
-           logging.info(f"flap happened outside monitoring period/max: {i}")
-           break
-    logging.info(f"BFD : keeping last period of flaps for {peer_ip}:{keep_flaps}")
-    flapmap[peer_ip] = keep_flaps
-    return len( keep_flaps ), keep_history
 
 ###########################
 # Invokes gnmic client to update router configuration, via bash script
@@ -335,8 +333,8 @@ def Run():
     response = stub.AgentRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
     logging.info(f"Registration response : {response.status}")
 
-    TestAddLinkLocal_Nexthop_Group('link_local','169.254.0.1')
-    TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
+    # TestAddLinkLocal_Nexthop_Group('link_local','169.254.0.1')
+    # TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
 
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
