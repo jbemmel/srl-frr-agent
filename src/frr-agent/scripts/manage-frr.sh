@@ -8,13 +8,14 @@
 # set -x # debug
 
 # Always set
-echo $network_instance
+echo "enabled_daemons='${enabled_daemons}' network_instance=${network_instance}"
 echo $admin_state
 
 # May not be set if $admin_state=="disable"
 echo $autonomous_system
 echo $router_id
 echo $bgp_neighbor_lines
+echo $eigrp
 
 NETNS="srbase-${network_instance}"
 DIR="/etc/frr/${NETNS}"
@@ -24,8 +25,9 @@ if [[ "${admin_state}" == "enable" ]]; then
 mkdir -p "${DIR}" && cp -f /etc/frr/daemons ${DIR} && \
  echo "watchfrr_options=\"--netns=${NETNS}\"" >> "${DIR}/daemons"
 
-for daemon in ${enabled_daemons}; do
- sed -i "s/^${daemon}=no/^${daemon}=yes/g" "${DIR}/daemons"
+for daemon in "${enabled_daemons}"; do
+ echo "Enabling daemon ${daemon} in network-instance ${network_instance}..."
+ sed -i "s/^${daemon}=no/${daemon}=yes/g" "${DIR}/daemons"
 done
 
 cat > $DIR/frr.conf << EOF
