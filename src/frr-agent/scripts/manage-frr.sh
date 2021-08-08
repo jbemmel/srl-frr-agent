@@ -31,7 +31,11 @@ for daemon in ${enabled_daemons}; do
 done
 
 if [[ "eigrp" == "enable" ]]; then
-EIGRP="router eigrp $autonomous_system"
+IFS='' read -r -d '' EIGRP_CONFIG << EOF
+router eigrp $autonomous_system
+ eigrp router-id $router_id
+ maximum-paths 4
+EOF
 fi
 
 cat > $DIR/frr.conf << EOF
@@ -40,6 +44,8 @@ log syslog informational
 ipv6 forwarding
 service integrated-vtysh-config
 !
+!
+${EIGRP_CONFIG}
 !
 router bgp $autonomous_system
  bgp router-id $router_id
@@ -67,7 +73,6 @@ router bgp $autonomous_system
   redistribute connected
  exit-address-family
  !
-\${EIGRP}
 line vty
 !
 EOF
