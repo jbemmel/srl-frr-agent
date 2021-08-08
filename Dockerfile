@@ -19,6 +19,9 @@ RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/frr-agent
 COPY --chown=srlinux:srlinux ./srl-frr-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/srlinux/agents/
 
+# run pylint to catch any obvious errors
+RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/srlinux/agents/frr-agent
+
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_UNNUMBERED_RELEASE="[custom build]"
 ENV SRL_UNNUMBERED_RELEASE=$SRL_UNNUMBERED_RELEASE

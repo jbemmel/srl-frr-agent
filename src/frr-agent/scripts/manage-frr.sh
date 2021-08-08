@@ -21,11 +21,11 @@ DIR="/etc/frr/${NETNS}"
 
 /usr/bin/sudo -E bash << EOFSUDO
 if [[ "${admin_state}" == "enable" ]]; then
-mkdir -p "$DIR" && cp -f /etc/frr/daemons $DIR && \
- echo "watchfrr_options=\"--netns=${NETNS}\"" >> "$DIR/daemons"
+mkdir -p "${DIR}" && cp -f /etc/frr/daemons ${DIR} && \
+ echo "watchfrr_options=\"--netns=${NETNS}\"" >> "${DIR}/daemons"
 
 for daemon in ${enabled_daemons}; do
- sed -i "s/${daemon}=no/${daemon}=yes/g" "$DIR/daemons"
+ sed -i "s/^${daemon}=no/^${daemon}=yes/g" "${DIR}/daemons"
 done
 
 cat > $DIR/frr.conf << EOF

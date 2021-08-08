@@ -65,6 +65,7 @@ gnmi_channel = grpc.insecure_channel(
 ##                      Route, Network Instance, Config
 ############################################################
 def Subscribe(stream_id, option):
+    # XXX Does not pass pylint
     op = sdk_service_pb2.NotificationRegisterRequest.AddSubscription
     if option == 'cfg':
         entry = config_service_pb2.ConfigSubscriptionRequest()
@@ -164,7 +165,7 @@ def gNMI_Set( gnmi_stub, path, data ):
    #  logging.info( f"Sending gNMI SET: {path} {config} {gnmic}" )
    update_msg = []
    u_path = gnmi_path_generator( path )
-   u_val = json.dumps(data).encode('utf-8')
+   u_val = bytes( json.dumps(data), 'utf-8' )
    update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
    update_request = SetRequest( update=update_msg )
    try:
@@ -257,19 +258,19 @@ def Handle_Notification(obj, state):
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
-                params[ "enabled_daemons" ] = ""
+                enabled_daemons = []
                 if 'admin_state' in data:
                     params[ "admin_state" ] = data['admin_state'][12:]
                     if params[ "admin_state" ] == "enable":
-                       params[ "enabled_daemons" ] = "bgpd"
+                       enabled_daemons.append( "bgpd" )
                 if 'autonomous_system' in data:
                     params[ "autonomous_system" ] = data['autonomous_system']['value']
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
                 if 'eigrp' in data:
-                    params[ "eigrp" ] = data['eigrp'][12:]
+                    params[ "eigrp" ] = data['eigrp'][6:]
                     if params[ "eigrp" ] == "enable":
-                       params[ "enabled_daemons" ] += " eigrpd"
+                       enabled_daemons.append( "eigrpd" )
 
                 if net_inst in state.network_instances:
                     lines = ""
@@ -281,6 +282,7 @@ def Handle_Notification(obj, state):
                 else:
                     state.network_instances[ net_inst ] = { **params, "interfaces" : {} }
 
+            params[ "enabled_daemons" ] = " ".join( enabled_daemons )
             script_update_frr(**params)
             if interfaces!=[] and params[ "admin_state" ] == "enable":
                MonitoringThread( net_inst, interfaces ).start()
