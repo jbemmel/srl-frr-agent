@@ -360,7 +360,7 @@ def script_update_frr(**kwargs):
 
     try:
        my_env = {**os.environ, **kwargs}
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/manage-frr.sh'],
+       script_proc = subprocess.Popen(['scripts/manage-frr.sh'],
                                        # preexec_fn=demote(frr_uid, frr_gid),
                                        env=my_env, # shell=False
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)

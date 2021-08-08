@@ -1,8 +1,8 @@
 # See example_config.yml for an explanation of all the accepted fields
 srl_frr_agent:
-   path: /etc/opt/srlinux/appmgr/
-   launch-command: /etc/opt/srlinux/appmgr/srl-frr-agent.sh
-   search-command: python3 /etc/opt/srlinux/appmgr/srl-frr-agent.py
+   path: /opt/srlinux/agents/frr-agent
+   launch-command: /opt/srlinux/agents/frr-agent/scripts/srl-frr-agent.sh
+   search-command: python3 /opt/srlinux/agents/frr-agent/srl-frr-agent.py
    wait-for-config: Yes
    failure-threshold: 100
    failure-action: wait=forever
@@ -12,6 +12,6 @@ srl_frr_agent:
        names:
            - "srl-frr-agent"
        source-directories:
-           - "/etc/opt/srlinux/appmgr/"
+           - "/opt/srlinux/agents/frr-agent/models/"
            - "/opt/srlinux/models/srl_nokia/models/common/"
            - "/opt/srlinux/models/srl_nokia/models/network-instance/"

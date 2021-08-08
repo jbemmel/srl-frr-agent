@@ -1,0 +1,82 @@
+#!/bin/bash
+
+#
+# Example of a more sophisticated script with routemaps, peergroups, etc.
+# The basic version puts all peers in the default group, and imports/exports all
+#
+
+set -x
+echo `whoami`
+
+# Always set
+echo $network_instance
+echo $admin_state
+
+# May not be set if $admin_state=="disable"
+echo $autonomous_system
+echo $router_id
+echo $peer_as
+
+NETNS="srbase-${network_instance}"
+DIR="/etc/frr/${NETNS}"
+
+/usr/bin/sudo -E bash << EOFSUDO
+if [[ "${admin_state}" == "enable" ]]; then
+mkdir -p "$DIR" && cp -f /etc/frr/daemons $DIR && \
+ echo "watchfrr_options=\"--netns=${NETNS}\"" >> $DIR/daemons
+
+cat > $DIR/frr.conf << EOF
+frr defaults datacenter
+log syslog informational
+ipv6 forwarding
+service integrated-vtysh-config
+!
+!
+router bgp $autonomous_system
+ bgp router-id $router_id
+ bgp ebgp-requires-policy
+ ! Avoid having to activate ipv6 for each neighbor/group separately
+ bgp default ipv6-unicast
+ no bgp network import-check
+ neighbor V4 peer-group
+ ! auto-discovers AS if 'external' or 'internal'
+ neighbor V4 remote-as ${peer_as}
+ ! neighbor 192.168.0.1 peer-group V4
+ neighbor e1-1.0 interface peer-group V4
+ neighbor e1-1.0 soft-reconfiguration inbound
+ neighbor V6 peer-group
+ neighbor V6 remote-as ${peer_as}
+ !
+ address-family ipv4 unicast
+  redistribute connected
+  neighbor V4 route-map IMPORT in
+  neighbor V4 route-map EXPORT out
+ exit-address-family
+ !
+ address-family ipv6 unicast
+  redistribute connected
+  neighbor V6 route-map IMPORT in
+  neighbor V6 route-map EXPORT out
+ exit-address-family
+ !
+route-map EXPORT permit 1
+!
+route-map EXPORT-ONLY-SPECIFIC permit 1
+ ! TODO need this, together with deny 100?
+ match interface lo0.0
+!
+route-map IMPORT permit 1
+!
+line vty
+!
+EOF
+chown -R frr:frr "${DIR}"
+/usr/lib/frr/frrinit.sh restart ${NETNS}
+else
+/usr/lib/frr/frrinit.sh stop ${NETNS}
+rm -rf "$DIR"
+fi
+
+EOFSUDO
+
+exit $?
