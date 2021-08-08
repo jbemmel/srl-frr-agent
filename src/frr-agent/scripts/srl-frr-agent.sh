@@ -23,9 +23,6 @@ function main()
     # and the correct python version is used
     source "${virtual_env}"
 
-    # Include agent specific paths, if any
-    export PYTHONPATH="$AGENT_PYTHONPATH:$PYTHONPATH"
-
     export http_proxy=""
     export https_proxy=""
     export no_proxy=""

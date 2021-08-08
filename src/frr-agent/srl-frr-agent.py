@@ -17,6 +17,8 @@ import subprocess
 # from concurrent.futures import ThreadPoolExecutor
 import pwd
 
+
+sys.path.append('/usr/lib/python3.6/site-packages/sdk_protos')
 import sdk_service_pb2
 import sdk_service_pb2_grpc
 import lldp_service_pb2
@@ -32,6 +34,7 @@ import telemetry_service_pb2_grpc
 # from pygnmi.client import gNMIclient, telemetryParser
 
 # pygnmi does not support multithreading, so we need to build it
+sys.path.append('/usr/local/lib/python3.6/site-packages:/usr/local/lib64/python3.6/site-packages')
 from pygnmi.spec.gnmi_pb2_grpc import gNMIStub
 from pygnmi.spec.gnmi_pb2 import SetRequest, Update, TypedValue
 from pygnmi.path_generator import gnmi_path_generator
