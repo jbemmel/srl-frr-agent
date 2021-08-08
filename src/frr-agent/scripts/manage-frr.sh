@@ -30,6 +30,10 @@ for daemon in ${enabled_daemons}; do
  sed -i "s/^\${daemon}=no/\${daemon}=yes/g" "${DIR}/daemons"
 done
 
+if [[ "eigrp" == "enable" ]]; then
+EIGRP="router eigrp $autonomous_system"
+fi
+
 cat > $DIR/frr.conf << EOF
 frr defaults datacenter
 log syslog informational
@@ -63,6 +67,7 @@ router bgp $autonomous_system
   redistribute connected
  exit-address-family
  !
+\${EIGRP}
 line vty
 !
 EOF
