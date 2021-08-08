@@ -25,8 +25,9 @@ if [[ "${admin_state}" == "enable" ]]; then
 mkdir -p "${DIR}" && cp -f /etc/frr/daemons ${DIR} && \
  echo "watchfrr_options=\"--netns=${NETNS}\"" >> "${DIR}/daemons"
 
-for daemon in "${enabled_daemons}"; do
- echo "Enabling daemon ${daemon} in network-instance ${network_instance}..."
+IFS=', ' read -r -a DAEMONS <<< "${enabled_daemons}"
+for daemon in "${DAEMONS[@]}"; do
+ echo "Enabling daemon '${daemon}' in network-instance ${network_instance}..."
  sed -i "s/^${daemon}=no/${daemon}=yes/g" "${DIR}/daemons"
 done
 
