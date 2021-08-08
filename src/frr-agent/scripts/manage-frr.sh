@@ -30,11 +30,17 @@ for daemon in ${enabled_daemons}; do
  sed -i "s/^\${daemon}=no/\${daemon}=yes/g" "${DIR}/daemons"
 done
 
-if [[ "eigrp" == "enable" ]]; then
+if [[ "$eigrp" == "enable" ]]; then
 IFS='' read -r -d '' EIGRP_CONFIG << EOF
 router eigrp $autonomous_system
  eigrp router-id $router_id
+ # Enable on all interfaces
+ network 0.0.0.0/0
  maximum-paths 4
+ # Exclude internal SR Linux interface
+ passive-interface gateway
+
+ # TODO: add explicit neighbor statements through Yang
 EOF
 fi
 

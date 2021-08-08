@@ -274,8 +274,9 @@ def Handle_Notification(obj, state):
                        enabled_daemons.append( "eigrpd" )
 
                 if net_inst in state.network_instances:
+                    ni = state.network_instances[ net_inst ]
                     lines = ""
-                    for name,peer_as in state.network_instances[ net_inst ]['interfaces'].items():
+                    for name,peer_as in ni['interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         interfaces.append( name )
@@ -318,6 +319,7 @@ def Handle_Notification(obj, state):
                    cmd = f"no neighbor {intf}"
                 if ni['admin_state']=='enable':
                    # TODO add 'interface {intf} ipv6 nd suppress-ra'? doesn't work
+                   # TODO support AS changes?
                    run_vtysh( ns=net_inst, asn=ni['autonomous_system'], config=[cmd] )
 
                    # Wait a few seconds, then retrieve the peer's router-id and AS
