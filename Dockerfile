@@ -8,7 +8,6 @@ RUN sudo yum install -y python3-pyroute2
 RUN curl https://rpm.frrouting.org/repo/frr-7-repo-1-0.el8.noarch.rpm -o /tmp/repo.rpm && \
     sudo yum install -y /tmp/repo.rpm && \
     sudo yum install -y frr frr-pythontools && \
-    sudo sed -i -e 's/bgpd=no/bgpd=yes/g' -e 's/eigrpd=no/eigrpd=yes/g' /etc/frr/daemons && \
     sudo chmod 644 /etc/frr/daemons && \
     rm -f /tmp/repo.rpm && sudo yum clean all -y
 

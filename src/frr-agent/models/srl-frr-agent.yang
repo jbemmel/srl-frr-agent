@@ -55,6 +55,13 @@ module srl-frr-agent {
 
                     Disable causes all BGP sessions to be taken down immediately, even if admin-state at the group or neighbor level of some of these sessions is still set as enable.";
             }
+            leaf eigrp {
+                type srl_nokia-comm:admin-state;
+                default "disable";
+
+                description
+                    "Administratively enable or disable the Enhanced Interior Gateway Routing Protocol (EIGRP) daemon";
+            }
             leaf autonomous-system {
                 type uint32 {
                   range "1..4294967295";

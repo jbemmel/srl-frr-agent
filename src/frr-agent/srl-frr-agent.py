@@ -257,12 +257,19 @@ def Handle_Notification(obj, state):
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
+                params[ "enabled_daemons" ] = ""
                 if 'admin_state' in data:
                     params[ "admin_state" ] = data['admin_state'][12:]
+                    if params[ "admin_state" ] == "enable":
+                       params[ "enabled_daemons" ] = "bgpd"
                 if 'autonomous_system' in data:
                     params[ "autonomous_system" ] = data['autonomous_system']['value']
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
+                if 'eigrp' in data:
+                    params[ "eigrp" ] = data['eigrp'][12:]
+                    if params[ "eigrp" ] == "enable":
+                       params[ "enabled_daemons" ] += " eigrpd"
 
                 if net_inst in state.network_instances:
                     lines = ""
