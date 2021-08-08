@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+#
+# TODO: Add CLI command to open vtysh: /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/
+#
+
 import grpc
 import datetime
 import time

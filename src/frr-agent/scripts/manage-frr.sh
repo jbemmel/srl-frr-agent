@@ -51,7 +51,7 @@ ipv6 forwarding
 service integrated-vtysh-config
 !
 !
-${EIGRP_CONFIG}
+\${EIGRP_CONFIG}
 !
 router bgp $autonomous_system
  bgp router-id $router_id
