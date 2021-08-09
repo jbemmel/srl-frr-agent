@@ -39,6 +39,54 @@ Unfortunately FPM protobuf support requires a custom FRR build
 
 At /var/run/frr/zserv.api there is a socket to connect to
 
+# SR Linux config snippets
+
+To configure this new experimental extension on SR Linux, a sample spine-leaf topology lab is included. Here are some minimal config snippets to copy:
+
+## BGP unnumbered (eBGP)
+Spine:
+```
+enter candidate
+/interface ethernet-1/1
+admin-state enable
+subinterface 0
+admin-state enable
+ipv4 { }
+ipv6 { }
+/interface lo0 subinterface 0 ipv4 address 100.1.0.1/32
+/network-instance default
+interface ethernet-1/1.0 bgp-unnumbered-peer-as external
+protocols experimental-frr
+admin-state enable
+router-id 1.1.0.1
+autonomous-system 65000
+commit stay
+```
+Leaf:
+```
+enter candidate
+/interface ethernet-1/1
+admin-state enable
+subinterface 0
+admin-state enable
+ipv4 { }
+ipv6 { }
+/interface lo0 subinterface 0 ipv4 address 100.1.1.1/32
+/network-instance default
+interface ethernet-1/1.0 bgp-unnumbered-peer-as external
+protocols experimental-frr
+admin-state enable
+router-id 1.1.1.1
+autonomous-system 65001
+commit stay
+```
+
+For vtysh access, a shell alias can be configured:
+```
+environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/"
+```
+(this is hardcoded to use the 'default' network-instance, a more generic CLI extension command could be built to support 'the current' namespace as well)
+
 ## Other thoughts
 It is also possible to dynamically assign /31 IPv4 addresses to the interfaces that participate in BGP unnumbered. If we discover the router ID of the peer and allow for a configurable IP range to use, then:
 * Calculate the difference between the router IDs, and use this as an index into the IP range. The lower ID gets .0 and the higher one gets .1 (out of a /31 pair)
