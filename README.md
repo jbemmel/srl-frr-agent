@@ -1,4 +1,4 @@
-# Extending SR Linux with open source functionality - exploring the 'adjacent possible'
+# Extending SR Linux with open source functionality - exploring 🚀 the 'adjacent possible'
 ![plot](./images/Adjacent_Possible2.png)
 
 The [adjacent possible](https://understandinginnovation.blog/2019/01/03/exploring-the-adjacent-possible-the-origin-of-good-ideas/) is the set of innovations that are available from a given starting point. Given a truly open platform based on Linux, there is a whole internet full of open source software that can now be integrated, enabling new ways to do things differently. By definition, such extensions are not 'mainstream' and hence not a good match for productization as official product features (with associated roadmap, support, QA, etc. ). However, it opens up a whole new area of networking solutions; this demo is but one small example.
