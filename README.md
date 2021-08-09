@@ -147,7 +147,7 @@ admin-state enable
 delete ipv4
 delete ipv6
 ipv4 {
-  address 10.0.0.1/24
+  address 10.0.0.0/31
 }
 /network-instance default
 interface ethernet-1/1.0 { }
@@ -168,7 +168,7 @@ admin-state enable
 delete ipv4
 delete ipv6
 ipv4 {
-  address 10.0.0.2/24
+  address 10.0.0.1/31
 }
 /network-instance default
 interface ethernet-1/1.0 { }
