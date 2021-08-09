@@ -1,4 +1,4 @@
-NAME        := srl/unnumbered
+NAME        := srl/frr-demo
 LAST_COMMIT := $(shell sh -c "git log -1 --pretty=%h")
 TODAY       := $(shell sh -c "date +%Y%m%d_%H%M")
 TAG         := ${TODAY}.${LAST_COMMIT}
