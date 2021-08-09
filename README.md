@@ -136,7 +136,7 @@ C>* 100.1.1.1/32 is directly connected, lo0.0, 00:05:57
 C>* 169.254.1.0/24 is directly connected, gateway, 00:05:57
 ```
 
-## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868
+## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868 (same AS)
 Spine:
 ```
 enter candidate
@@ -176,7 +176,7 @@ interface ethernet-1/1.0 { }
 protocols experimental-frr
 admin-state enable
 router-id 1.1.1.1
-autonomous-system 65001
+autonomous-system 65000
 bgp disable
 eigrp enable
 commit stay
