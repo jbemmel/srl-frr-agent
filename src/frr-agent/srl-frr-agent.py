@@ -287,6 +287,7 @@ def Handle_Notification(obj, state):
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         interfaces.append( name )
                     params[ "bgp_neighbor_lines"] = lines
+                    ni.update( params )
                 else:
                     state.network_instances[ net_inst ] = { **params, "interfaces" : {} }
 
@@ -335,7 +336,10 @@ def Handle_Notification(obj, state):
                        MonitoringThread(net_inst,[intf]).start()
 
             elif peer_as is not None:
-                state.network_instances[ net_inst ] = { "interfaces" : { intf : peer_as } }
+                state.network_instances[ net_inst ] = {
+                  "interfaces" : { intf : peer_as },
+                  "admin-state" : "disable"
+                }
     else:
         logging.info(f"Unexpected notification : {obj}")
 
