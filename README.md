@@ -60,6 +60,7 @@ ipv6 { }
 interface ethernet-1/1.0 bgp-unnumbered-peer-as external
 protocols experimental-frr
 admin-state enable
+bgp enable
 router-id 1.1.0.1
 autonomous-system 65000
 commit stay
@@ -78,6 +79,7 @@ ipv6 { }
 interface ethernet-1/1.0 bgp-unnumbered-peer-as external
 protocols experimental-frr
 admin-state enable
+bgp enable
 router-id 1.1.1.1
 autonomous-system 65001
 commit stay
