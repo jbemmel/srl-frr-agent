@@ -91,6 +91,37 @@ environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run
 ```
 (this is hardcoded to use the 'default' network-instance, a more generic CLI extension command could be built to support 'the current' namespace as well - see /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/deploy_agent.py for an example)
 
+After establishing the alias, the BGP peering status can be examined:
+```
+show bgp summary
+```
+Which should look something like this:
+`
+leaf1# show bgp sum
+
+IPv4 Unicast Summary:
+BGP router identifier 1.1.1.1, local AS number 65001 vrf-id 0
+BGP table version 4
+RIB entries 7, using 1288 bytes of memory
+Peers 1, using 727 KiB of memory
+
+Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
+spine1(e1-1.0)  4      65000        75        75        0    0    0 00:03:22            2        4 N/A
+
+Total number of neighbors 1
+
+IPv6 Unicast Summary:
+BGP router identifier 1.1.1.1, local AS number 65001 vrf-id 0
+BGP table version 0
+RIB entries 0, using 0 bytes of memory
+Peers 1, using 727 KiB of memory
+
+Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
+spine1(e1-1.0)  4      65000        75        75        0    0    0 00:03:22            0        0 N/A
+
+Total number of neighbors 1
+`
+
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868
 Spine:
 ```
