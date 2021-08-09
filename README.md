@@ -89,6 +89,50 @@ environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run
 ```
 (this is hardcoded to use the 'default' network-instance, a more generic CLI extension command could be built to support 'the current' namespace as well - see /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/deploy_agent.py for an example)
 
+## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868
+Spine:
+```
+enter candidate
+/interface ethernet-1/1
+admin-state enable
+subinterface 0
+admin-state enable
+delete ipv4
+delete ipv6
+ipv4 {
+  address { ip-prefix 10.0.0.1/24 }
+}
+/network-instance default
+interface ethernet-1/1.0 { }
+protocols experimental-frr
+admin-state enable
+router-id 1.1.0.1
+autonomous-system 65000
+eigrp enable
+commit stay
+```
+Leaf:
+```
+enter candidate
+/interface ethernet-1/1
+admin-state enable
+subinterface 0
+admin-state enable
+delete ipv4
+delete ipv6
+ipv4 {
+  address { ip-prefix 10.0.0.2/24 }
+}
+/network-instance default
+interface ethernet-1/1.0 { }
+protocols experimental-frr
+admin-state enable
+router-id 1.1.1.1
+autonomous-system 65001
+eigrp enable
+commit stay
+```
+
 ## Other thoughts
 It is also possible to dynamically assign /31 IPv4 addresses to the interfaces that participate in BGP unnumbered. If we discover the router ID of the peer and allow for a configurable IP range to use, then:
 * Calculate the difference between the router IDs, and use this as an index into the IP range. The lower ID gets .0 and the higher one gets .1 (out of a /31 pair)
