@@ -3,6 +3,8 @@
 
 #
 # TODO: Add CLI command to open vtysh: /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/
+# or simply alias:
+# environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/"
 #
 
 import grpc
@@ -217,16 +219,16 @@ class MonitoringThread(Thread):
                 _js = json.loads( json_data )
                 if _i in _js:
                    i = _js[ _i ]
-                   neighbor = i['bgpNeighborAddr']
-                   if neighbor!="none":
+                   neighbor = i['bgpNeighborAddr'] #ipv6 link-local
+                   peerId = i['remoteRouterId']
+                   if neighbor!="none" and peerId!="0.0.0.0":
                       # dont have the MAC address, but can derive it from ipv6 link local
-                      peer_ip = i['remoteRouterId']
-                      mac = ipv6_2_mac(neighbor) if neighbor != 'none' else '?'
+                      mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
-                      logging.info( f"id={peer_ip} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      ConfigurePeerIPMAC( _i, peer_ip, mac, gnmi_stub )
-                      ConfigureNextHopGroup( self.net_inst, _i, peer_ip, gnmi_stub )
+                      logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
+                      ConfigurePeerIPMAC( _i, peerId, mac, gnmi_stub )
+                      ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       self.interfaces.remove( _i )
 
          time.sleep(10)
