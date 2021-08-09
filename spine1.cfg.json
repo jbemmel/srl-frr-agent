@@ -457,6 +457,12 @@
             }
           },
           {
+            "sequence-id": 285,
+            "description": "Accept incoming EIGRP messages",
+            "action": { "accept": { } },
+            "match": { "protocol": 88 }
+          },
+          {
             "sequence-id": 290,
             "description": "Accept incoming OSPF messages",
             "action": {
@@ -466,18 +472,6 @@
             },
             "match": {
               "protocol": 89
-            }
-          },
-          {
-            "sequence-id": 291,
-            "description": "Accept incoming EIGRP messages (ipv4)",
-            "action": {
-              "accept": {
-
-              }
-            },
-            "match": {
-              "protocol": 88
             }
           },
           {
@@ -1046,6 +1040,18 @@
             }
           },
           {
+            "sequence-id": 335,
+            "description": "Accept incoming EIGRP messages",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "next-header": 88
+            }
+          },
+          {
             "sequence-id": 340,
             "description": "Accept incoming OSPF messages",
             "action": {
@@ -1055,18 +1061,6 @@
             },
             "match": {
               "next-header": 89
-            }
-          },
-          {
-            "sequence-id": 341,
-            "description": "Accept incoming EIGRP messages (ipv6)",
-            "action": {
-              "accept": {
-
-              }
-            },
-            "match": {
-              "next-header": 88
             }
           },
           {
