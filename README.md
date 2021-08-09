@@ -96,7 +96,7 @@ After establishing the alias, the BGP peering status can be examined:
 show bgp summary
 ```
 Which should look something like this:
-`
+```
 leaf1# show bgp sum
 
 IPv4 Unicast Summary:
@@ -120,7 +120,7 @@ Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down Sta
 spine1(e1-1.0)  4      65000        75        75        0    0    0 00:03:22            0        0 N/A
 
 Total number of neighbors 1
-`
+```
 
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868
 Spine:
