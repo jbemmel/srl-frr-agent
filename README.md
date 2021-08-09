@@ -1,7 +1,9 @@
-# srl-unnumbered
-Experimenting with running FRR on top of SR Linux
+# Extending SR Linux with open source functionality - exploring the 'adjacent possible'
+The [adjacent possible](https://understandinginnovation.blog/2019/01/03/exploring-the-adjacent-possible-the-origin-of-good-ideas/) is the set of innovations that are available from a given starting point. Given a truly open platform based on Linux, there is a whole internet full of open source software that can now be integrated, enabling new ways to do things differently. By definition, such extensions are not 'mainstream' and hence not a good match for productization as official product features (with associated roadmap, support, QA, etc. ). However, given some basic examples of how to go about this, it opens up a whole new area of networking solutions.
 
-FRR supports BGP unnumbered ([RFC5549](https://datatracker.ietf.org/doc/html/rfc5549)), including support for advertising IPv4 next hops over an IPv6 BGP peering session (using auto-assigned link-local addresses ). The next hop that is advertised, is the IPv4 router ID of each node
+## Experimenting with running FRR on top of SR Linux: BGP unnumbered
+
+FRR supports BGP unnumbered ([RFC5549](https://datatracker.ietf.org/doc/html/rfc5549)). The idea is to limit the use of statically assigned addresses to just an IPv4 router ID on a loopback interface, combined with auto-assigned (SLAAC) link-local IPv6 addresses on interfaces. Peer AS numbers are automatically discovered, and BGP extended next-hop encoding is used to advertise IPv4 routes with an IPv6 next hop.
 
 FRR by default puts its routes in the Linux kernel, and it is possible to listen for Netlink events to receive changes (see sample Python code).
 Using the 'zebra' protocol, 'ip neighbor' shows how a custom static ARP entry for '169.254.0.1' gets inserted to resolve the (dummy) IPv4 next hop:
@@ -20,9 +22,13 @@ On the peer, the _exact same address_ is used:
 fe80::9f:7fff:feff:1 dev e1-1.0 lladdr 02:9f:7f:ff:00:01 router REACHABLE
 ...
 ```
-This works because link local addresses are not tested for duplicate IPs. However, it looks like SRL refuses to use them as a next hop address when configured statically.
+SR Linux does not allow configuration of link-local addresses on interfaces, and next hops with such addresses are currently ignored. Therefore, this demo agent instead creates a pair of /31 IPv4 addresses based on the peer's IPv4 router ID, and assigns that to the interface after the automatic IPv6 BGP peering session is established.
 
-It is also possible to listen to Zebra's netlink socket directly, see https://zstas.github.io/jekyll/update/2020/02/25/bgp.html
+## Populating the data path: adding routes using the SR Linux NDK
+
+By default, FRR integrates with the Linux kernel and populates a network namespace with the routes it learns. Using a Netlink socket, applications can connect to a namespace and receive events about routes being added or removed.
+
+It may also be possible to listen to Zebra's netlink socket directly, see https://zstas.github.io/jekyll/update/2020/02/25/bgp.html - however, the Linux kernel events are more generic, and better documented.
 
 ```
 sudo /usr/lib/frr/zebra -f /etc/frr/zebra.conf -u frr -M fpm:protobuf -t
