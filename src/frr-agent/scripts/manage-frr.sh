@@ -42,6 +42,8 @@ router eigrp $autonomous_system
 
  # TODO: add static neighbor statements through Yang?
 EOF
+else
+EIGRP_CONFIG="no router eigrp $autonomous_system"
 fi
 
 if [[ "$bgp" == "enable" ]]; then
@@ -73,6 +75,8 @@ router bgp $autonomous_system
  exit-address-family
  !
 EOF
+else
+BGP_CONFIG="no router bgp $autonomous_system"
 fi
 
 cat > "$DIR/frr.conf" << EOF
