@@ -469,6 +469,18 @@
             }
           },
           {
+            "sequence-id": 291,
+            "description": "Accept incoming EIGRP messages (ipv4)",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": 88
+            }
+          },
+          {
             "sequence-id": 300,
             "description": "Accept incoming DHCP relay messages targeted for BOOTP/DHCP server",
             "action": {
@@ -1043,6 +1055,18 @@
             },
             "match": {
               "next-header": 89
+            }
+          },
+          {
+            "sequence-id": 341,
+            "description": "Accept incoming EIGRP messages (ipv6)",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "next-header": 88
             }
           },
           {
