@@ -91,9 +91,10 @@ environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run
 ```
 (this is hardcoded to use the 'default' network-instance, a more generic CLI extension command could be built to support 'the current' namespace as well - see /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/deploy_agent.py for an example)
 
-After establishing the alias, the BGP peering status can be examined:
+After establishing the alias, the BGP peering status and routing table can be examined:
 ```
 show bgp summary
+show ip route
 ```
 Which should look something like this:
 ```
@@ -120,6 +121,19 @@ Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down Sta
 spine1(e1-1.0)  4      65000        75        75        0    0    0 00:03:22            0        0 N/A
 
 Total number of neighbors 1
+
+leaf1# show ip route
+Codes: K - kernel route, C - connected, S - static, R - RIP,
+       O - OSPF, I - IS-IS, B - BGP, E - EIGRP, N - NHRP,
+       T - Table, A - Babel, F - PBR, f - OpenFabric,
+       > - selected route, * - FIB route, q - queued, r - rejected, b - backup
+       t - trapped, o - offload failure
+
+C>* 1.1.0.0/31 is directly connected, e1-1.0, 00:05:41
+B>* 1.1.1.0/31 [20/0] via fe80::a5:2cff:feff:1, e1-1.0, weight 1, 00:05:41
+B>* 100.1.0.1/32 [20/0] via fe80::a5:2cff:feff:1, e1-1.0, weight 1, 00:05:52
+C>* 100.1.1.1/32 is directly connected, lo0.0, 00:05:57
+C>* 169.254.1.0/24 is directly connected, gateway, 00:05:57
 ```
 
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868
