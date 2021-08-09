@@ -73,6 +73,7 @@ router bgp $autonomous_system
  exit-address-family
  !
 EOF
+fi
 
 cat > "$DIR/frr.conf" << EOF
 frr defaults datacenter
