@@ -87,7 +87,7 @@ For vtysh access, a shell alias can be configured:
 ```
 environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/"
 ```
-(this is hardcoded to use the 'default' network-instance, a more generic CLI extension command could be built to support 'the current' namespace as well)
+(this is hardcoded to use the 'default' network-instance, a more generic CLI extension command could be built to support 'the current' namespace as well - see /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/deploy_agent.py for an example)
 
 ## Other thoughts
 It is also possible to dynamically assign /31 IPv4 addresses to the interfaces that participate in BGP unnumbered. If we discover the router ID of the peer and allow for a configurable IP range to use, then:
