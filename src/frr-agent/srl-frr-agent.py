@@ -279,6 +279,8 @@ def Handle_Notification(obj, state):
                     if params[ "eigrp" ] == "enable":
                        enabled_daemons.append( "eigrpd" )
 
+                       # Could dynamically create CPM filter for IP proto 88
+
                 if net_inst in state.network_instances:
                     ni = state.network_instances[ net_inst ]
                     lines = ""
