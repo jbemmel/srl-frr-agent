@@ -40,19 +40,12 @@ router eigrp $autonomous_system
  # Exclude internal SR Linux interface
  passive-interface gateway
 
- # TODO: add explicit neighbor statements through Yang
+ # TODO: add static neighbor statements through Yang?
 EOF
 fi
 
-cat > $DIR/frr.conf << EOF
-frr defaults datacenter
-log syslog informational
-ipv6 forwarding
-service integrated-vtysh-config
-!
-!
-\${EIGRP_CONFIG}
-!
+if [[ "$bgp" == "enable" ]]; then
+IFS='' read -r -d '' BGP_CONFIG << EOF
 router bgp $autonomous_system
  bgp router-id $router_id
  # Disable RFC8212 compliance, turned off by default for datacenter case
@@ -79,6 +72,19 @@ router bgp $autonomous_system
   redistribute connected
  exit-address-family
  !
+EOF
+
+cat > "$DIR/frr.conf" << EOF
+frr defaults datacenter
+log syslog informational
+ipv6 forwarding
+service integrated-vtysh-config
+!
+!
+\${EIGRP_CONFIG}
+!
+\${BGP_CONFIG}
+!
 line vty
 !
 EOF

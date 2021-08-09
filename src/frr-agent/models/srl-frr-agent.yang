@@ -42,9 +42,9 @@ module srl-frr-agent {
             must "../../type != 'srl_nokia-netinst:mac-vrf'" {
               error-message "FRR configuration is not supported on network-instance of type mac-vrf";
             }
-            must "not(../bgp)" {
-              error-message "Either BGP or FRR can be configured for a network-instance, not both";
-            }
+            // must "not(../bgp)" {
+            //  error-message "Either BGP or FRR can be configured for a network-instance, not both";
+            // }
 
             leaf admin-state {
                 type srl_nokia-comm:admin-state;
@@ -55,12 +55,27 @@ module srl-frr-agent {
 
                     Disable causes all BGP sessions to be taken down immediately, even if admin-state at the group or neighbor level of some of these sessions is still set as enable.";
             }
+            leaf bgp {
+                type srl_nokia-comm:admin-state;
+                default "enable";
+
+                description
+                    "Administratively enable or disable the FRR BGP daemon";
+
+                must ". = 'disable' or not(../../bgp)" {
+                   error-message "Either Nokia BGP or FRR BGP can be configured for a network-instance, not both";
+                }
+            }
             leaf eigrp {
                 type srl_nokia-comm:admin-state;
                 default "disable";
 
                 description
                     "Administratively enable or disable the Enhanced Interior Gateway Routing Protocol (EIGRP) daemon";
+
+                must ". = 'disable' or ../autonomous-system < 65536" {
+                   error-message "EIGRP only supports AS numbers between 1 and 65535";
+                }
             }
             leaf autonomous-system {
                 type uint32 {

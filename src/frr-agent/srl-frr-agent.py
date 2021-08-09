@@ -179,7 +179,7 @@ def gNMI_Set( gnmi_stub, path, data ):
          # Leaving out 'metadata' does return an error, so the call goes through
          # It just doesn't show up in CLI (cached), logout+login fixes it
          res = gnmi_stub.Set( update_request, metadata=gnmi_options )
-         logging.info( f"Past gnmi.Set {path}: {res}" )
+         logging.info( f"After gnmi.Set {path}: {res}" )
          return res
    except grpc._channel._InactiveRpcError as err:
          logging.error(err)
@@ -268,12 +268,14 @@ def Handle_Notification(obj, state):
                 enabled_daemons = []
                 if 'admin_state' in data:
                     params[ "admin_state" ] = data['admin_state'][12:]
-                    if params[ "admin_state" ] == "enable":
-                       enabled_daemons.append( "bgpd" )
                 if 'autonomous_system' in data:
                     params[ "autonomous_system" ] = data['autonomous_system']['value']
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
+                if 'bgp' in data:
+                    params[ "bgp" ] = data['bgp'][4:]
+                    if params[ "bgp" ] == "enable":
+                       enabled_daemons.append( "bgpd" )
                 if 'eigrp' in data:
                     params[ "eigrp" ] = data['eigrp'][6:]
                     if params[ "eigrp" ] == "enable":
@@ -295,10 +297,10 @@ def Handle_Notification(obj, state):
 
             params[ "enabled_daemons" ] = " ".join( enabled_daemons )
             script_update_frr(**params)
-            if interfaces!=[] and params[ "admin_state" ] == "enable":
+            if interfaces!=[] and params[ "bgp" ] == "enable":
                MonitoringThread( net_inst, interfaces ).start()
             else:
-               logging.info( "interfaces==[] or disabled, not starting monitor thread yet" )
+               logging.info( "interfaces==[] or FRR BGP disabled, not starting monitor thread yet" )
             return True
 
         # Tends to come first (always?) when full blob is configured
