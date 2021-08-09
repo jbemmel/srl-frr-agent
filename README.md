@@ -155,6 +155,7 @@ protocols experimental-frr
 admin-state enable
 router-id 1.1.0.1
 autonomous-system 65000
+bgp disable
 eigrp enable
 commit stay
 ```
@@ -176,6 +177,7 @@ protocols experimental-frr
 admin-state enable
 router-id 1.1.1.1
 autonomous-system 65001
+bgp disable
 eigrp enable
 commit stay
 ```
