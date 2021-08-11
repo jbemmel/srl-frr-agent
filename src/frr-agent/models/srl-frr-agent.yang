@@ -185,14 +185,14 @@ module srl-frr-agent {
 
        container openfabric {
 
-         must "../../srl_nokia-netinst:protocols/experimental-frr" {
-           error-message "OpenFabric requires experimental-frr to be configured for this network-instance";
-         }
-
          leaf activate {
            description "Activate OpenFabric on this interface";
            type boolean;
-           default true;
+           default false;
+
+           must ".=false() or ../../../srl_nokia-netinst:protocols/experimental-frr" {
+             error-message "OpenFabric requires experimental-frr to be configured for this network-instance";
+           }
          }
        }
     }
