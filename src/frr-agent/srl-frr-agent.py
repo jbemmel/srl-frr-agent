@@ -301,7 +301,7 @@ def Handle_Notification(obj, state):
                     params[ "bgp_neighbor_lines"] = lines
                     ni.update( params )
                 else:
-                    state.network_instances[ net_inst ] = { **params, "interfaces" : {} }
+                    state.network_instances[ net_inst ] = { **params, "interfaces" : {}, "openfabric_interfaces" : {} }
 
             params[ "enabled_daemons" ] = " ".join( enabled_daemons )
             script_update_frr(**params)
@@ -326,8 +326,9 @@ def Handle_Notification(obj, state):
                elif 'bgp_unnumbered_peer_as_uint32' in _i:
                   peer_as = _i['bgp_unnumbered_peer_as_uint32']['value']
 
-               if 'openconfig' in _i:
-                  logging.info(f"TODO: process openconfig interface config : {_i['openconfig']}")
+               # Can show up here, but also below in .openfabric (duplicate?)
+               if 'openfabric' in _i:
+                  logging.info(f"TODO: process openfabric interface config : {_i['openfabric']}")
 
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             # lookup AS for this ns, check if enabled (i.e. daemon running)
@@ -342,7 +343,9 @@ def Handle_Notification(obj, state):
                 if ni['admin_state']=='enable':
                    # TODO add 'interface {intf} ipv6 nd suppress-ra'? doesn't work
                    # TODO support AS changes?
-                   run_vtysh( ns=net_inst, asn=ni['autonomous_system'], config=[cmd] )
+                   run_vtysh( ns=net_inst,
+                              context=f"router bgp {ni['autonomous_system']}",
+                              config=[cmd] )
 
                    # Wait a few seconds, then retrieve the peer's router-id and AS
                    if peer_as is not None:
@@ -353,8 +356,38 @@ def Handle_Notification(obj, state):
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
                   "interfaces" : { intf : peer_as },
-                  "admin-state" : "disable"
+                  "admin-state" : "disable",
+                  "openfabric_interfaces" : {},
+                  "openfabric" : "disable"
                 }
+
+        elif obj.config.key.js_path == ".network_instance.interface.openfabric":
+            logging.info("Process openfabric interface config")
+            json_acceptable_string = obj.config.data.json.replace("'", "\"")
+            data = json.loads(json_acceptable_string)
+
+            # Given the key, this should be present
+            activate = data['activate']['value']
+            intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
+            if net_inst in state.network_instances:
+                ni = state.network_instances[ net_inst ]
+                if ni['openfabric']=='enable':
+                   name = ni['openfabric_name']
+                   _no = "" if activate else "no "
+                   run_vtysh( ns=net_inst,
+                              context=f"interface {intf}",
+                              config=[f"{_no}ip router openfabric {name}"] )
+                else:
+                   ni['openfabric_interfaces'][ intf ] = True
+
+            elif activate:
+                state.network_instances[ net_inst ] = {
+                  "openfabric_interfaces" : { intf : True },
+                  "openfabric" : "disable",
+                  "interfaces" : {},
+                  "admin-state" : "disable",
+                }
+
     else:
         logging.info(f"Unexpected notification : {obj}")
 
@@ -406,13 +439,14 @@ def script_update_frr(**kwargs):
     except Exception as e:
        logging.error(f'Exception caught in script_update_frr :: {e}')
 
-def run_vtysh(ns,asn=0,show=[],config=[]):
-    logging.info(f'Calling vtysh: ns={ns} show={show} config={config}' )
+# router statement: e.g. "router bgp <as>" or "router openfabric NAME"
+def run_vtysh(ns,context='',show=[],config=[]):
+    logging.info(f'Calling vtysh: ns={ns} router={router} show={show} config={config}' )
     try:
        args = ['/usr/bin/sudo', '/usr/bin/vtysh',
                '--vty_socket', f'/var/run/frr/srbase-{ns}/']
        if config!=[]:
-          args += [ '-c', 'configure terminal', '-c', f'router bgp {asn}' ]
+          args += [ '-c', 'configure terminal', '-c', context ]
        args += sum( [ [ "-c", x ] for x in config ], [] )
        args += sum( [ [ "-c", x ] for x in show   ], [] )
        vtysh_proc = subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
