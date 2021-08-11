@@ -9,6 +9,7 @@
 
 # Always set
 echo "enabled_daemons='${enabled_daemons}' network_instance=${network_instance}"
+echo "Linux NETNS=${NETNS}"
 echo $admin_state
 
 # May not be set if $admin_state=="disable"
@@ -17,7 +18,7 @@ echo $router_id
 echo $bgp_neighbor_lines
 echo $eigrp
 
-NETNS="srbase-${network_instance}"
+# NETNS="srbase-${network_instance}" # now set in Python
 DIR="/etc/frr/${NETNS}"
 
 /usr/bin/sudo -E bash << EOFSUDO
