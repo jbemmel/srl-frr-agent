@@ -23,7 +23,8 @@ DIR="/etc/frr/${NETNS}"
 /usr/bin/sudo -E bash << EOFSUDO
 if [[ "${admin_state}" == "enable" ]]; then
 mkdir -p "${DIR}" && cp -f /etc/frr/daemons ${DIR} && \
- echo "watchfrr_options=\"--netns=${NETNS}\"" >> "${DIR}/daemons"
+ echo "watchfrr_options=\"--netns=${NETNS}\"" >> "${DIR}/daemons" && \
+ echo "frr_profile=\"datacenter\"" >> "${DIR}/daemons"
 
 for daemon in ${enabled_daemons}; do
  echo "Enabling daemon '\${daemon}' in network-instance ${network_instance}..."
@@ -40,6 +41,7 @@ FABRIC_TIER=" fabric-tier $openfabric_fabric_tier"
 fi
 IFS='' read -r -d '' OPENFABRIC_CONFIG << EOF
 router openfabric $openfabric_name
+ net $openfabric_net
 \$DOMAIN_PASSWORD
 \$FABRIC_TIER
 EOF

@@ -286,6 +286,7 @@ def Handle_Notification(obj, state):
                    if params[ "openfabric" ] == "enable":
                       enabled_daemons.append( "fabricd" )
                    params[ "openfabric_name" ] = openfabric['name']['value']
+                   params[ "openfabric_net" ] = openfabric['net']['value']
                    params[ "openfabric_domain_password" ] = openfabric['domain_password']['value']
 
                        # Could dynamically create CPM filter for IP proto 88
