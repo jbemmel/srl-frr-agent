@@ -184,30 +184,32 @@ commit stay
 
 ## OpenFabric
 
-Using CLI extensions to script the config for 'spine1' and some other node
+Using CLI extensions to script the config for 'spine1' and some other node. The snippet below first annotates the system as '0' or '1' based on its hostname,
+then references this annotation to generate things like IP addresses and other identities
 ```
 enter candidate
+/system !!! ${//system/name/host-name|'0' if _=='spine1' else '1'}
 /interface ethernet-1/1
 admin-state enable
 subinterface 0
 admin-state enable
 ipv4
-  address 10.0.0.${//system/name/host-name|'0' if _=='spine1' else '1'}/31
+  address 10.0.0.${/system!!!}/31
   exit
 exit
 ipv6 { }
-/interface lo0 subinterface 0 ipv4 address 100.1.${//system/name/host-name|'0' if _=='spine1' else '1'}.1/32
+/interface lo0 subinterface 0 ipv4 address 100.1.${/system!!!}.1/32
 /network-instance default
 interface ethernet-1/1.0 openfabric activate true
 interface lo0.0 openfabric activate true
 protocols experimental-frr
 admin-state enable
 bgp disable
-router-id 1.1.${//system/name/host-name|'0' if _=='spine1' else '1'}.1
+router-id 1.1.${/system!!!}.1
 autonomous-system 65000
 openfabric {
   name JvB
-  net 49.0000.0000.000${//system/name/host-name|'1' if _=='spine1' else '2'}.00
+  net 49.0000.0000.000${/system!!!|int(_)+1}.00
 }
 commit stay
 ```
