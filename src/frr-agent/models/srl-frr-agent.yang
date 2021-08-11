@@ -191,7 +191,7 @@ module srl-frr-agent {
        container openfabric {
 
          leaf activate {
-           description "Activate OpenFabric on this interface";
+           description "Activate OpenFabric for this interface";
            type boolean;
            default false;
 

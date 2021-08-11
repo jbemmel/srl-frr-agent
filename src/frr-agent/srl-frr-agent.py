@@ -306,6 +306,8 @@ def Handle_Notification(obj, state):
                       for _if in ni['openfabric_interfaces']:
                         # Add single indent space for each sub line
                         lines2 += f'interface {_if}\n ip router openfabric {_of}'
+                        if _if[0:1] == "lo":
+                           lines2 += ' openfabric passive'
                       params[ "openfabric_interface_lines" ] = lines2
 
                     ni.update( params )
@@ -383,9 +385,10 @@ def Handle_Notification(obj, state):
                 if ni['openfabric']=='enable':
                    name = ni['openfabric_name']
                    _no = "" if activate else "no "
-                   run_vtysh( ns=net_inst,
-                              context=f"interface {intf}",
-                              config=[f"{_no}ip router openfabric {name}"] )
+                   cmds = [ f"{_no}ip router openfabric {name}" ]
+                   if intf[0:1] == "lo" and activate:
+                      cmds += "openfabric passive"
+                   run_vtysh( ns=net_inst,context=f"interface {intf}",config=cmds )
                 else:
                    ni['openfabric_interfaces'][ intf ] = True
 
