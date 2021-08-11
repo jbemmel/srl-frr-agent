@@ -299,6 +299,15 @@ def Handle_Notification(obj, state):
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         interfaces.append( name )
                     params[ "bgp_neighbor_lines"] = lines
+
+                    if 'openfabric_name' in params:
+                      _of = params['openfabric_name' ]
+                      lines2 = ""
+                      for _if in ni['openfabric_interfaces']:
+                        # Add single indent space for each sub line
+                        lines2 += f'interface {_if}\n ip router openfabric {_of}'
+                      params[ "openfabric_interface_lines" ] = lines2
+
                     ni.update( params )
                 else:
                     state.network_instances[ net_inst ] = { **params, "interfaces" : {}, "openfabric_interfaces" : {} }

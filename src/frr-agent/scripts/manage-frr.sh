@@ -40,6 +40,8 @@ if [[ "$openfabric_fabric_tier" != "" ]]; then
 FABRIC_TIER=" fabric-tier $openfabric_fabric_tier"
 fi
 IFS='' read -r -d '' OPENFABRIC_CONFIG << EOF
+${openfabric_interface_lines}
+!
 router openfabric $openfabric_name
  net $openfabric_net
 \$DOMAIN_PASSWORD
