@@ -326,6 +326,9 @@ def Handle_Notification(obj, state):
                elif 'bgp_unnumbered_peer_as_uint32' in _i:
                   peer_as = _i['bgp_unnumbered_peer_as_uint32']['value']
 
+               if 'openconfig' in _i:
+                  logging.info(f"TODO: process openconfig interface config : {_i['openconfig']}")
+
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             # lookup AS for this ns, check if enabled (i.e. daemon running)
             if net_inst in state.network_instances:

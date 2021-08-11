@@ -113,8 +113,8 @@ module srl-frr-agent {
               }
               leaf net {
                 type string;
-                description "Network Entity Title (NET), default sample config";
-                default "49.0000.0000.0001.00";
+                mandatory "true";
+                description "Network Entity Title (NET), e.g. '49.0000.0000.0001.00'";
               }
               leaf admin-state {
                 type srl_nokia-comm:admin-state;
