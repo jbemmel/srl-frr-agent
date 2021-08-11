@@ -30,6 +30,11 @@ for daemon in ${enabled_daemons}; do
  sed -i "s/^\${daemon}=no/\${daemon}=yes/g" "${DIR}/daemons"
 done
 
+if [[ "$openfabric" == "enable" ]]; then
+IFS='' read -r -d '' OPENFABRIC_CONFIG << EOF
+router openfabric $openfabric_name
+EOF
+
 if [[ "$eigrp" == "enable" ]]; then
 IFS='' read -r -d '' EIGRP_CONFIG << EOF
 router eigrp $autonomous_system
@@ -89,6 +94,8 @@ service integrated-vtysh-config
 \${EIGRP_CONFIG}
 !
 \${BGP_CONFIG}
+!
+\${OPENFABRIC_CONFIG}
 !
 line vty
 !
