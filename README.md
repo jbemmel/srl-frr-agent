@@ -182,6 +182,36 @@ eigrp enable
 commit stay
 ```
 
+## OpenFabric
+
+Using CLI extensions to script the config for 'spine1' and some other node
+```
+enter candidate
+/interface ethernet-1/1
+admin-state enable
+subinterface 0
+admin-state enable
+ipv4
+  address 10.0.0.${//system/name/host-name|'0' if _=='spine1' else '1'}/31
+  exit
+exit
+ipv6 { }
+/interface lo0 subinterface 0 ipv4 address 100.1.${//system/name/host-name|'0' if _=='spine1' else '1'}.1/32
+/network-instance default
+interface ethernet-1/1.0 openfabric activate true
+interface lo0.0 openfabric activate true
+protocols experimental-frr
+admin-state enable
+bgp disable
+router-id 1.1.${//system/name/host-name|'0' if _=='spine1' else '1'}.1
+autonomous-system 65000
+openfabric {
+  name JvB
+  net 49.0000.0000.000${//system/name/host-name|'1' if _=='spine1' else '2'}.00
+}
+commit stay
+```
+
 ## Other thoughts
 It is also possible to dynamically assign /31 IPv4 addresses to the interfaces that participate in BGP unnumbered. If we discover the router ID of the peer and allow for a configurable IP range to use, then:
 * Calculate the difference between the router IDs, and use this as an index into the IP range. The lower ID gets .0 and the higher one gets .1 (out of a /31 pair)
