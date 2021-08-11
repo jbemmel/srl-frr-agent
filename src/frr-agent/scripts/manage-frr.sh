@@ -31,9 +31,19 @@ for daemon in ${enabled_daemons}; do
 done
 
 if [[ "$openfabric" == "enable" ]]; then
+
+if [[ "$openfabric_domain_password" != "" ]]; then
+DOMAIN_PASSWORD=" domain-password md5 $openfabric_domain_password"
+fi
+if [[ "$openfabric_fabric_tier" != "" ]]; then
+FABRIC_TIER=" fabric-tier $openfabric_fabric_tier"
+fi
 IFS='' read -r -d '' OPENFABRIC_CONFIG << EOF
 router openfabric $openfabric_name
+\$DOMAIN_PASSWORD
+\$FABRIC_TIER
 EOF
+fi
 
 if [[ "$eigrp" == "enable" ]]; then
 IFS='' read -r -d '' EIGRP_CONFIG << EOF
