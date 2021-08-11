@@ -367,7 +367,7 @@ def Handle_Notification(obj, state):
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
                   "interfaces" : { intf : peer_as },
-                  "admin-state" : "disable",
+                  "admin_state" : "disable",
                   "openfabric_interfaces" : {},
                   "openfabric" : "disable"
                 }
@@ -397,7 +397,7 @@ def Handle_Notification(obj, state):
                   "openfabric_interfaces" : { intf : True },
                   "openfabric" : "disable",
                   "interfaces" : {},
-                  "admin-state" : "disable",
+                  "admin_state" : "disable",
                 }
 
     else:
