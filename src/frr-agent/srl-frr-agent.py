@@ -441,7 +441,7 @@ def script_update_frr(**kwargs):
 
 # router statement: e.g. "router bgp <as>" or "router openfabric NAME"
 def run_vtysh(ns,context='',show=[],config=[]):
-    logging.info(f'Calling vtysh: ns={ns} router={router} show={show} config={config}' )
+    logging.info(f'Calling vtysh: ns={ns} context={context} show={show} config={config}' )
     try:
        args = ['/usr/bin/sudo', '/usr/bin/vtysh',
                '--vty_socket', f'/var/run/frr/srbase-{ns}/']
