@@ -109,7 +109,7 @@ module srl-frr-agent {
               presence "Configure OpenFabric";
               leaf name {
                 type string;
-                default "SRLinux"
+                default "SRLinux";
                 description "Fabric name (required, default 'SRLinux')";
               }
               leaf net {
