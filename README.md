@@ -145,11 +145,11 @@ enter candidate
 admin-state enable
 subinterface 0
 admin-state enable
-delete ipv4
-delete ipv6
-ipv4 {
+ipv4
   address 10.0.0.${/system!!!}/31
-}
+  exit
+exit
+ipv6 { }
 /network-instance default
 interface ethernet-1/1.0 { }
 protocols experimental-frr
@@ -160,6 +160,8 @@ bgp disable
 eigrp enable
 commit stay
 ```
+
+Non-native multicast on subinterfaces is not supported by SR Linux, so the agent builds and manages its own subinterfaces under the hood.
 
 ## OpenFabric
 
