@@ -66,16 +66,25 @@ module srl-frr-agent {
                    error-message "Either Nokia BGP or FRR BGP can be configured for a network-instance, not both";
                 }
             }
-            leaf eigrp {
+            container eigrp {
+              presence "Configure EIGRP";
+              leaf admin-state {
                 type srl_nokia-comm:admin-state;
-                default "disable";
+                default "enable";
 
                 description
                     "Administratively enable or disable the Enhanced Interior Gateway Routing Protocol (EIGRP) daemon";
 
-                must ". = 'disable' or ../autonomous-system < 65536" {
+                must ". = 'disable' or ../../autonomous-system < 65536" {
                    error-message "EIGRP only supports AS numbers between 1 and 65535";
                 }
+              }
+
+              leaf create-veth-multicast-bypass {
+                type boolean;
+                default true;
+                description "Enable multicast reception by creating a custom subinterface on e1-1";
+              }
             }
             leaf autonomous-system {
                 type uint32 {

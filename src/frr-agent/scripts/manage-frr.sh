@@ -22,12 +22,12 @@ NETNS="srbase-${network_instance}"
 DIR="/etc/frr/${NETNS}"
 
 # IP Multicast is not supported on SRLinux subinterfaces - so we create our own
-if [[ "$eigrp" == "enable" ]]; then
+if [[ "$eigrp_create_veth_pair" == "yes" ]]; then
   # Connect a veth pair directly to e1-1 in srbase netns
   # Could do this for every interface, but this is just a Proof-of-Concept
   # Similarly, could clone IPv6 addresses
-IP=`ip netns exec ${NETNS} ip addr show dev e1-1.0 | awk '/inet /{ print \$2 }'`
-ip netns exec ${NETNS} ip link del e1-1.0
+# IP=`ip netns exec ${NETNS} ip addr show dev e1-1.0 | awk '/inet /{ print \$2 }'`
+# ip netns exec ${NETNS} ip link del e1-1.0
 DEV="eigrp-e1"  # DEV=e1-1.0 becomes unstable
 ip link add eigrp-e1 netns srbase type veth peer ${DEV} netns ${NETNS}
 ip netns exec srbase bash -c "ip link add name br-eigrp-e1 type bridge ; \
@@ -35,9 +35,9 @@ ip netns exec srbase bash -c "ip link add name br-eigrp-e1 type bridge ; \
                               ip link set dev eigrp-e1 up && \
                               ip link set dev e1-1 master br-eigrp-e1 && \
                               ip link set dev eigrp-e1 master br-eigrp-e1"
-ip netns exec ${NETNS} bash -c "ip addr add $IP dev ${DEV} && \
-                                ip link set dev ${DEV} up"
-
+# ip netns exec ${NETNS} bash -c "ip addr add $IP dev ${DEV} && \
+#                                 ip link set dev ${DEV} up"
+ip netns exec ${NETNS} ip link set dev ${DEV} up
 fi
 
 /usr/bin/sudo -E bash << EOFSUDO

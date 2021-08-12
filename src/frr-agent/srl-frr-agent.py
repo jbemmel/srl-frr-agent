@@ -107,7 +107,7 @@ def GetSystemMAC():
       result = gnmi.get( encoding='json_ietf', path=[path] )
       for e in result['notification']:
          if 'update' in e:
-           logging.info(f"GOT Update :: {e['update']}")
+           logging.info(f"GetSystemMAC GOT Update :: {e['update']}")
            for u in e['update']:
                for j in u['val']['entry']:
                   return j # XX probably incorrect
@@ -296,11 +296,14 @@ def Handle_Notification(obj, state):
                     if params[ "bgp" ] == "enable":
                        enabled_daemons.append( "bgpd" )
                 if 'eigrp' in data:
-                    params[ "eigrp" ] = data['eigrp'][6:]
-                    if params[ "eigrp" ] == "enable":
-                       # Multicast only works in 'srbase' namespace? nope
-                       # params[ "NETNS" ] = "srbase"
-                       enabled_daemons.append( "eigrpd" )
+                    eigrp = data['eigrp']
+                    if 'admin_state' in eigrp:
+                      params[ "eigrp" ] = data['admin_state'][12:]
+                      if params[ "eigrp" ] == "enable":
+                         enabled_daemons.append( "eigrpd" )
+                    if 'create_veth_multicast_bypass' in eigrp:
+                        yes = eigrp['create_veth_multicast_bypass']['value']
+                        params[ "eigrp_create_veth_pair" ] = "yes" if yes else "no"
                 if 'openfabric' in data:
                    openfabric = data['openfabric']
                    params[ "openfabric" ] = openfabric['admin_state'][12:]
@@ -314,6 +317,8 @@ def Handle_Notification(obj, state):
                    if params[ "openfabric_net" ] == "auto":
                        mac = GetSystemMAC()
                        params[ "openfabric_net" ] = f"49.0001.{ mac.replace(':','.') }.00"
+                else:
+                   params[ "openfabric" ] = "disable"
 
                 # Could dynamically create CPM filter for IP proto 88
 
