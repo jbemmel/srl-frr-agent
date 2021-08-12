@@ -106,15 +106,17 @@ module srl-frr-agent {
             }
 
             container openfabric {
+              presence "Configure OpenFabric";
               leaf name {
                 type string;
-                mandatory "true";
-                description "Fabric name (required)";
+                default "SRLinux"
+                description "Fabric name (required, default 'SRLinux')";
               }
               leaf net {
                 type string;
-                mandatory "true";
-                description "Network Entity Title (NET), e.g. '49.0000.0000.0001.00'";
+                default "auto";
+                description "Network Entity Title (NET), e.g. '49.0000.0000.0001.00'
+                             Default 'auto' uses 49.0001.<6-byte system MAC>.00";
               }
               leaf admin-state {
                 type srl_nokia-comm:admin-state;

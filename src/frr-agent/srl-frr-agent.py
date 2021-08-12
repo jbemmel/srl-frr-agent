@@ -36,7 +36,7 @@ import sdk_common_pb2
 import telemetry_service_pb2
 import telemetry_service_pb2_grpc
 
-# from pygnmi.client import gNMIclient, telemetryParser
+from pygnmi.client import gNMIclient
 
 # pygnmi does not support multithreading, so we need to build it
 from pygnmi.spec.gnmi_pb2_grpc import gNMIStub
@@ -95,6 +95,24 @@ def Subscribe_Notifications(stream_id):
 
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
+
+#
+# Uses gNMI to get /platform/chassis/mac-address
+#
+def GetSystemMAC():
+   path = '/platform/chassis/mac-address'
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                            username="admin",password="admin",
+                            insecure=True, debug=False) as gnmi:
+      result = gnmi.get( encoding='json_ietf', path=[path] )
+      for e in result['notification']:
+         if 'update' in e:
+           logging.info(f"GOT Update :: {e['update']}")
+           for u in e['update']:
+               for j in u['val']['entry']:
+                  return j # XX probably incorrect
+
+   return "0000.0000.0000"
 
 def ipv6_2_mac(ipv6):
     # remove subnet info if given
@@ -291,7 +309,12 @@ def Handle_Notification(obj, state):
                    params[ "openfabric_net" ] = openfabric['net']['value']
                    params[ "openfabric_domain_password" ] = openfabric['domain_password']['value']
 
-                       # Could dynamically create CPM filter for IP proto 88
+                   # Support 'auto' net value: 49.area 0001.<6-byte MAC>.00
+                   if params[ "openfabric_net" ] == "auto":
+                       mac = GetSystemMAC()
+                       params[ "openfabric_net" ] = f"49.0001.{ mac.replace(':','.') }.00"
+
+                # Could dynamically create CPM filter for IP proto 88
 
                 if net_inst in state.network_instances:
                     ni = state.network_instances[ net_inst ]
