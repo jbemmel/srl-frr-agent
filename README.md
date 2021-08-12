@@ -232,7 +232,7 @@ router-id 1.1.${/system!!!}.1
 autonomous-system 65000
 openfabric {
   name SRLinux
-  net 49.0000.0000.000${/system!!!|int(_)+1}.00
+  net auto !!! This uses 49.0000.<system-MAC>.00 as network entity title (NET)
 }
 commit stay
 ```
