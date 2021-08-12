@@ -143,7 +143,13 @@ enter candidate
 /system !!! ${//system/name/host-name|'0' if _=='spine1' else '1'}
 /interface ethernet-1/1
 admin-state enable
-delete subinterface 0
+subinterface 0
+admin-state enable
+ipv4
+  address 10.0.0.${/system!!!}/31
+  exit
+exit
+ipv6 { }
 /network-instance default
 protocols experimental-frr
 admin-state enable
