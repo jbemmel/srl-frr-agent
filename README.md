@@ -137,9 +137,10 @@ C>* 169.254.1.0/24 is directly connected, gateway, 00:05:57
 ```
 
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868 (same AS)
-Spine:
+Spine + Leaf:
 ```
 enter candidate
+/system !!! ${//system/name/host-name|'0' if _=='spine1' else '1'}
 /interface ethernet-1/1
 admin-state enable
 subinterface 0
@@ -147,35 +148,13 @@ admin-state enable
 delete ipv4
 delete ipv6
 ipv4 {
-  address 10.0.0.0/31
+  address 10.0.0.${/system!!!}/31
 }
 /network-instance default
 interface ethernet-1/1.0 { }
 protocols experimental-frr
 admin-state enable
-router-id 1.1.0.1
-autonomous-system 65000
-bgp disable
-eigrp enable
-commit stay
-```
-Leaf:
-```
-enter candidate
-/interface ethernet-1/1
-admin-state enable
-subinterface 0
-admin-state enable
-delete ipv4
-delete ipv6
-ipv4 {
-  address 10.0.0.1/31
-}
-/network-instance default
-interface ethernet-1/1.0 { }
-protocols experimental-frr
-admin-state enable
-router-id 1.1.1.1
+router-id 1.1.${/system!!!}.1
 autonomous-system 65000
 bgp disable
 eigrp enable
