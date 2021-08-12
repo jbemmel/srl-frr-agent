@@ -150,7 +150,7 @@ admin-state enable
 router-id 1.1.${/system!!!}.1
 autonomous-system 65000
 bgp disable
-eigrp enable
+eigrp admin-state enable
 commit stay
 ```
 
