@@ -155,6 +155,55 @@ commit stay
 ```
 
 Non-native multicast on subinterfaces is not supported by SR Linux, so the agent builds and manages its own subinterfaces behind the scenes.
+We can manage the IP interfaces through FRR:
+
+Spine:
+```
+A:spine1# vtysh network-instance default
+
+spine1# conf t
+spine1(config)# int eigrp-e1 
+spine1(config-if)# ip address 10.0.0.0/31
+spine1(config-if)# end
+spine1# show ip eigrp neighbors 
+
+EIGRP neighbors for AS(65000)
+
+H   Address           Interface            Hold   Uptime   SRTT   RTO   Q     Seq  
+                                           (sec)           (ms)        Cnt    Num   
+```
+
+Leaf:
+```
+A:leaf1# vtysh network-instance default
+
+leaf1# conf t
+leaf1(config)# int eigrp-e1 
+leaf1(config-if)# ip address 10.0.0.1/31
+leaf1(config-if)# end
+leaf1# ping 10.0.0.0 
+  <cr>  
+leaf1# ping 10.0.0.0 
+PING 10.0.0.0 (10.0.0.0) 56(84) bytes of data.
+64 bytes from 10.0.0.0: icmp_seq=1 ttl=64 time=0.074 ms
+64 bytes from 10.0.0.0: icmp_seq=2 ttl=64 time=0.083 ms
+64 bytes from 10.0.0.0: icmp_seq=3 ttl=64 time=0.081 ms
+64 bytes from 10.0.0.0: icmp_seq=4 ttl=64 time=0.062 ms
+64 bytes from 10.0.0.0: icmp_seq=5 ttl=64 time=0.056 ms
+^C
+--- 10.0.0.0 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4094ms
+rtt min/avg/max/mdev = 0.056/0.071/0.083/0.011 ms
+leaf1# show ip eigrp neighbors 
+
+EIGRP neighbors for AS(65000)
+
+H   Address           Interface            Hold   Uptime   SRTT   RTO   Q     Seq  
+                                           (sec)           (ms)        Cnt    Num   
+0   10.0.0.0          eigrp-e1             11     0        0      2    0      4
+```
+
+Q.E.D.
 
 ## OpenFabric
 
