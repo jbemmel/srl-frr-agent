@@ -9,7 +9,6 @@
 
 # Always set
 echo "enabled_daemons='${enabled_daemons}' network_instance=${network_instance}"
-echo "Linux NETNS=${NETNS}"
 echo $admin_state
 
 # May not be set if $admin_state=="disable"
@@ -18,8 +17,27 @@ echo $router_id
 echo $bgp_neighbor_lines
 echo $eigrp
 
-# NETNS="srbase-${network_instance}" # now set in Python
+# Tried running eigrpd in 'srbase' netns -> unstable
+NETNS="srbase-${network_instance}"
 DIR="/etc/frr/${NETNS}"
+
+# IP Multicast is not supported on SRLinux subinterfaces - so we create our own
+if [[ "$eigrp" == "enable" ]]; then
+  # Connect a veth pair directly to e1-1 in srbase netns
+  # Could do this for every interface, but this is just a Proof-of-Concept
+  # Similarly, could clone IPv6 addresses
+IP=`ip netns exec ${NETNS} ip addr show dev e1-1.0 | awk '/inet /{ print \$2 }'`
+ip netns exec ${NETNS} ip link del e1-1.0
+ip link add eigrp-e1 netns srbase type veth peer e1-1.0 netns ${NETNS}
+ip netns exec srbase bash -c "ip link add name br-eigrp-e1 type bridge ; \
+                              ip link set dev br-eigrp-e1 up && \
+                              ip link set dev eigrp-e1 up && \
+                              ip link set dev e1-1 master br-eigrp-e1 && \
+                              ip link set dev eigrp-e1 master br-eigrp-e1"
+ip netns exec ${NETNS} bash -c "ip addr add $IP dev e1-1.0 && \
+                                      ip link set dev e1-1.0 up"
+
+fi
 
 /usr/bin/sudo -E bash << EOFSUDO
 if [[ "${admin_state}" == "enable" ]]; then

@@ -270,7 +270,8 @@ def Handle_Notification(obj, state):
         if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
-            params = { "network_instance" : net_inst, "NETNS" : f'srbase-{net_inst}' }
+            # Could define NETNS here: "NETNS" : f'srbase-{net_inst}'
+            params = { "network_instance" : net_inst }
             interfaces = []
             if obj.config.op == 2:
                 logging.info(f"Delete config scenario")
@@ -297,8 +298,8 @@ def Handle_Notification(obj, state):
                 if 'eigrp' in data:
                     params[ "eigrp" ] = data['eigrp'][6:]
                     if params[ "eigrp" ] == "enable":
-                       # Multicast only works in 'srbase' namespace
-                       params[ "NETNS" ] = "srbase"
+                       # Multicast only works in 'srbase' namespace? nope
+                       # params[ "NETNS" ] = "srbase"
                        enabled_daemons.append( "eigrpd" )
                 if 'openfabric' in data:
                    openfabric = data['openfabric']
