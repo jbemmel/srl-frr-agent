@@ -151,7 +151,7 @@ ipv4
 exit
 ipv6 { }
 /network-instance default
-interface ethernet-1/1.0
+interface ethernet-1/1.0 { }
 protocols experimental-frr
 admin-state enable
 router-id 1.1.${/system!!!}.1
