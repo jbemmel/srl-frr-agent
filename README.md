@@ -143,25 +143,67 @@ enter candidate
 /system !!! ${//system/name/host-name|'0' if _=='spine1' else '1'}
 /interface ethernet-1/1
 admin-state enable
-subinterface 0
-admin-state enable
-ipv4
-  address 10.0.0.${/system!!!}/31
-  exit
-exit
-ipv6 { }
+delete subinterface 0
 /network-instance default
-interface ethernet-1/1.0 { }
 protocols experimental-frr
 admin-state enable
 router-id 1.1.${/system!!!}.1
 autonomous-system 65000
 bgp disable
-eigrp enable
+eigrp admin-state enable
 commit stay
 ```
 
-Non-native multicast on subinterfaces is not supported by SR Linux, so the agent builds and manages its own subinterfaces under the hood.
+Non-native multicast on subinterfaces is not supported by SR Linux, so the agent builds and manages its own subinterfaces behind the scenes.
+We can manage the IP interfaces through FRR:
+
+Spine:
+```
+A:spine1# vtysh network-instance default
+
+spine1# conf t
+spine1(config)# int eigrp-e1 
+spine1(config-if)# ip address 10.0.0.0/31
+spine1(config-if)# end
+spine1# show ip eigrp neighbors 
+
+EIGRP neighbors for AS(65000)
+
+H   Address           Interface            Hold   Uptime   SRTT   RTO   Q     Seq  
+                                           (sec)           (ms)        Cnt    Num   
+```
+
+Leaf:
+```
+A:leaf1# vtysh network-instance default
+
+leaf1# conf t
+leaf1(config)# int eigrp-e1 
+leaf1(config-if)# ip address 10.0.0.1/31
+leaf1(config-if)# end
+leaf1# ping 10.0.0.0 
+  <cr>  
+leaf1# ping 10.0.0.0 
+PING 10.0.0.0 (10.0.0.0) 56(84) bytes of data.
+64 bytes from 10.0.0.0: icmp_seq=1 ttl=64 time=0.074 ms
+64 bytes from 10.0.0.0: icmp_seq=2 ttl=64 time=0.083 ms
+64 bytes from 10.0.0.0: icmp_seq=3 ttl=64 time=0.081 ms
+64 bytes from 10.0.0.0: icmp_seq=4 ttl=64 time=0.062 ms
+64 bytes from 10.0.0.0: icmp_seq=5 ttl=64 time=0.056 ms
+^C
+--- 10.0.0.0 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4094ms
+rtt min/avg/max/mdev = 0.056/0.071/0.083/0.011 ms
+leaf1# show ip eigrp neighbors 
+
+EIGRP neighbors for AS(65000)
+
+H   Address           Interface            Hold   Uptime   SRTT   RTO   Q     Seq  
+                                           (sec)           (ms)        Cnt    Num   
+0   10.0.0.0          eigrp-e1             11     0        0      2    0      4
+```
+
+Q.E.D.
 
 ## OpenFabric
 
