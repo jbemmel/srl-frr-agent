@@ -5,9 +5,9 @@ RUN sudo yum install -y python3-pyroute2
 
 # Install FRR stable, enable BGP daemon
 # frr-stable or frr-8 or frr-7
+#    sudo sed -i 's|el8/frr8|el8/frr8.freeze|g' /etc/yum.repos.d/frr-8.repo && \
 RUN curl https://rpm.frrouting.org/repo/frr-8-repo-1-0.el8.noarch.rpm -o /tmp/repo.rpm && \
     sudo yum install -y /tmp/repo.rpm && \
-    sudo sed -i 's|el8/frr8|el8/frr8.freeze|g' /etc/yum.repos.d/frr-8.repo && \
     sudo yum install -y frr frr-pythontools && \
     sudo chmod 644 /etc/frr/daemons && \
     rm -f /tmp/repo.rpm && sudo yum clean all -y

@@ -43,12 +43,19 @@ from pygnmi.spec.gnmi_pb2_grpc import gNMIStub
 from pygnmi.spec.gnmi_pb2 import SetRequest, Update, TypedValue
 from pygnmi.path_generator import gnmi_path_generator
 
+# Needs yum install python3-pyroute2 -y
+from pyroute2 import IPDB
+from pyroute2 import NetNS
+
 from logging.handlers import RotatingFileHandler
 
 ############################################################
 ## Agent will start with this name
 ############################################################
 agent_name='srl_frr_agent'
+
+# Global IPDB
+ipdb = None
 
 ############################################################
 ## Open a GRPC channel to connect to sdk_mgr on the dut
@@ -97,7 +104,7 @@ def Subscribe_Notifications(stream_id):
     Subscribe(stream_id, 'cfg')
 
 #
-# Uses gNMI to get /platform/chassis/mac-address
+# Uses gNMI to get /platform/chassis/mac-address and format as hhhh.hhhh.hhhh
 #
 def GetSystemMAC():
    path = '/platform/chassis/mac-address'
@@ -108,9 +115,8 @@ def GetSystemMAC():
       for e in result['notification']:
          if 'update' in e:
            logging.info(f"GetSystemMAC GOT Update :: {e['update']}")
-           for u in e['update']:
-               for j in u['val']['entry']:
-                  return j # XX probably incorrect
+           m = e['update'][0]['val'] # aa:bb:cc:dd:ee:ff
+           return f'{m[0]}{m[1]}.{m[2]}{m[3]}.{m[4]}{m[5]}'
 
    return "0000.0000.0000"
 
@@ -209,6 +215,13 @@ def gNMI_Set( gnmi_stub, path, data ):
              logging.info(f"OK, success? {res}")
              return res
          raise err
+
+def Add_Route(netlink_msg):
+    return
+
+def Del_Route(netlink_msg):
+    return
+
 #
 # Runs as a separate thread
 #
@@ -228,6 +241,21 @@ class MonitoringThread(Thread):
       gnmi_stub = gNMIStub( gnmi_channel )
 
       logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
+
+      global ipdb
+      ipdb = IPDB(nl=NetNS(f'srbase-{self.net_inst}'))
+      # Register our callback to the IPDB
+      def netlink_callback(ipdb, msg, action):
+          logging.info(f"IPDB callback msg={msg} action={action}")
+          if action=="RTM_NEWROUTE":
+             Add_Route(msg)
+          elif action=="RTM_DELROUTE":
+             Del_Route(msg)
+          else:
+             logging.info( f"Ignoring: {action}" )
+
+      ipdb.register_callback(netlink_callback)
+
       try:
         while self.interfaces != []:
          for _i in self.interfaces:
@@ -252,6 +280,13 @@ class MonitoringThread(Thread):
          time.sleep(10)
       except Exception as e:
          logging.error(e)
+
+      # After setting up the BGP peering, monitor route events
+      self.daemon = True
+
+      # This thread does nothing but waiting for signals - needed?
+      signal.pause()
+
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
 
@@ -316,7 +351,7 @@ def Handle_Notification(obj, state):
                    # Support 'auto' net value: 49.area 0001.<6-byte MAC>.00
                    if params[ "openfabric_net" ] == "auto":
                        mac = GetSystemMAC()
-                       params[ "openfabric_net" ] = f"49.0001.{ mac.replace(':','.') }.00"
+                       params[ "openfabric_net" ] = f"49.0001.{ mac }.00"
                 else:
                    params[ "openfabric" ] = "disable"
 
@@ -553,27 +588,25 @@ def Run():
                     logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
-        logging.info(f'GOING TO EXIT NOW: {err}')
+        logging.info(f'_Rendezvous error: {err}')
 
     except Exception as e:
         logging.error(f'Exception caught :: {e}')
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
-        try:
-            response = stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-            logging.error(f'Run try: Unregister response:: {response}')
-        except grpc._channel._Rendezvous as err:
-            logging.info(f'GOING TO EXIT NOW: {err}')
-            sys.exit()
-        return True
-    sys.exit()
-    return True
+
+    Exit_Gracefully(0,0)
+
 ############################################################
 ## Gracefully handle SIGTERM signal
 ## When called, will unregister Agent and gracefully exit
 ############################################################
 def Exit_Gracefully(signum, frame):
-    logging.info("Caught signal :: {}\n will unregister fib_agent".format(signum))
+    logging.info("Caught signal :: {}\n will unregister frr_agent".format(signum))
+    global ipdb
+    if ipdb is not None:
+        ipdb.release()
+        ipdb = None
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
         logging.error('try: Unregister response:: {}'.format(response))
@@ -599,7 +632,4 @@ if __name__ == '__main__':
       format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
       datefmt='%H:%M:%S', level=logging.INFO)
     logging.info("START TIME :: {}".format(datetime.datetime.now()))
-    if Run():
-        logging.info('Agent unregistered and agent routes withdrawed from dut')
-    else:
-        logging.info('Should not happen')
+    Run()
