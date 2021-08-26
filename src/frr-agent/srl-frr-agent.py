@@ -242,19 +242,22 @@ class MonitoringThread(Thread):
 
       logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
 
-      global ipdb
-      ipdb = IPDB(nl=NetNS(f'srbase-{self.net_inst}'))
-      # Register our callback to the IPDB
-      def netlink_callback(ipdb, msg, action):
-          logging.info(f"IPDB callback msg={msg} action={action}")
-          if action=="RTM_NEWROUTE":
-             Add_Route(msg)
-          elif action=="RTM_DELROUTE":
-             Del_Route(msg)
-          else:
-             logging.info( f"Ignoring: {action}" )
+      try:
+         global ipdb
+         ipdb = IPDB(nl=NetNS(f'srbase-{self.net_inst}'))
+         # Register our callback to the IPDB
+         def netlink_callback(ipdb, msg, action):
+             logging.info(f"IPDB callback msg={msg} action={action}")
+             if action=="RTM_NEWROUTE":
+                Add_Route(msg)
+             elif action=="RTM_DELROUTE":
+                Del_Route(msg)
+             else:
+                logging.info( f"Ignoring: {action}" )
 
-      ipdb.register_callback(netlink_callback)
+         ipdb.register_callback(netlink_callback)
+      except Exception as ex:
+         logging.error( f"Exception while starting IPDB callback: {ex}" )
 
       try:
         while self.interfaces != []:
