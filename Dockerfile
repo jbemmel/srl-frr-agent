@@ -8,7 +8,8 @@ RUN sudo yum install -y python3-pyroute2
 FROM centos:8 AS build-frr-with-flexible-ports
 
 # Install build tools
-RUN dnf install -y --enablerepo=PowerTools git autoconf pcre-devel \
+RUN yum config-manager --set-enabled powertools && \
+  dnf install -y --enablerepo=powertools git autoconf pcre-devel \
   automake libtool make readline-devel texinfo net-snmp-devel pkgconfig \
   groff pkgconfig json-c-devel pam-devel bison flex python2-pytest \
   c-ares-devel python2-devel libcap-devel \
