@@ -33,6 +33,33 @@ spine e1-1.0: 1.1.1.0/31 -> leaf  = 1.1.1.1 (router ID)
 leaf  e1-1.0: 1.1.0.0/31 -> spine = 1.1.0.1 (router ID)
 ```
 
+These addresses are automatically managed by the agent:
+```
+A:spine1# /interface ethernet-1/1                                                                                                                                                                                  
+--{ + running }--[ interface ethernet-1/1 ]--                                                                                                                                                                      
+A:spine1# info                                                                                                                                                                                                     
+    admin-state enable
+    subinterface 0 {
+        admin-state enable
+        ipv4 {
+            address 1.1.1.0/31 {
+                primary
+            }
+            arp {
+                neighbor 1.1.1.1 {
+                    link-layer-address 02:2D:12:FF:00:01 !!! managed by SRL FRR agent
+                }
+            }
+        }
+        ipv6 {
+            address ::ffff:1.1.0.1/127 {
+                primary
+            }
+        }
+    }
+--{ + running }--[ interface ethernet-1/1 ]--
+```
+
 ## Populating the data path: adding routes using the SR Linux NDK
 
 By default, FRR integrates with the Linux kernel and populates a network namespace with the routes it learns. Using a Netlink socket, applications can connect to a namespace and receive events about routes being added or removed.
