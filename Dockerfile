@@ -1,16 +1,33 @@
 ARG SR_LINUX_RELEASE
-FROM srl/custombase:$SR_LINUX_RELEASE
+FROM srl/custombase:$SR_LINUX_RELEASE AS target
 
 RUN sudo yum install -y python3-pyroute2
+
+# Build FRR with  support for non-default BGP ports for unnumbered interfaces
+# Use separate build image and copy only resulting binaries, else 3.4GB
+FROM centos:8 AS build-frr-with-flexible-ports
+
+# Install build tools
+RUN yum install -y gcc-c++ git autoconf make openssl-devel && \
+    git clone https://github.com/exergy-connect/frr.git && \
+    cd frr && \
+    ./bootstrap.sh && \
+    ./configure --enable-protobuf --enable-datacenter --enable-grpc \
+      --disable-ripd --disable-ripngd --disable-ospfd --disable-ospf6d \
+      --disable-ldpd --disable-nhrpd  --disable-babeld --disable-isisd \
+      --disable-pimd --disable-pbrd --disable-staticd --disable-vrrpd --disable-pathd && \
+    make -j && make install
+
+FROM target AS final-image
 
 # Install FRR stable, enable BGP daemon
 # frr-stable or frr-8 or frr-7
 #    sudo sed -i 's|el8/frr8|el8/frr8.freeze|g' /etc/yum.repos.d/frr-8.repo && \
-RUN curl https://rpm.frrouting.org/repo/frr-8-repo-1-0.el8.noarch.rpm -o /tmp/repo.rpm && \
-    sudo yum install -y /tmp/repo.rpm && \
-    sudo yum install -y frr frr-pythontools && \
-    sudo chmod 644 /etc/frr/daemons && \
-    rm -f /tmp/repo.rpm && sudo yum clean all -y
+#RUN curl https://rpm.frrouting.org/repo/frr-8-repo-1-0.el8.noarch.rpm -o /tmp/repo.rpm && \
+#    sudo yum install -y /tmp/repo.rpm && \
+#    sudo yum install -y frr frr-pythontools && \
+#    sudo chmod 644 /etc/frr/daemons && \
+#    rm -f /tmp/repo.rpm && sudo yum clean all -y
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
 # Issue is that these addresses do not get installed as next hop in the RT

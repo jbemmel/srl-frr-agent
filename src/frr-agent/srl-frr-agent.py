@@ -151,7 +151,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, gnmi_stub ):
 
    # For IPv6, build a /127 based on mapped ipv4 of lowest ID
    lowest_id = min(local_ip,peer_ip)
-   mapped_v4 = '2001::ffff:' + lowest_id # Try 'regular' v6
+   mapped_v4 = '::ffff:' + lowest_id # Or 'regular' v6: '2001::ffff:'
    v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
    _i = v6_ips.index( str(ipaddress.ip_address(mapped_v4)) )
@@ -260,10 +260,11 @@ def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local,ipv6_nexthop):
 
     # SRL does not allow link local address to be used as NH, use mapped ipv4
     nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
+    # nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_link_local).packed # FAILS
 
-    logging.info(f"NH_REQUEST :: {nh_request}")
+    logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
     nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
-    logging.info(f"NH_RESPONSE :: {nhg_response.status} {nhg_response.error_str}")
+    logging.info(f"NextHopGroupAddOrUpdate :: {nhg_response.status} {nhg_response.error_str}")
     return nhg_response.status != 0
 
 def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6):

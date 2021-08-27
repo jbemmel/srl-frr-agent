@@ -11,7 +11,7 @@ override SR_LINUX_RELEASE="latest"
 endif
 
 build:
-	sudo docker build --build-arg SRL_UNNUMBERED_RELEASE=${TAG} \
+	sudo DOCKER_BUILDKIT=1 docker build --build-arg SRL_UNNUMBERED_RELEASE=${TAG} \
 	                  --build-arg http_proxy=${HTTP_PROXY} \
 										--build-arg https_proxy=${HTTP_PROXY} \
 	                  --build-arg SR_LINUX_RELEASE="${SR_LINUX_RELEASE}" \
