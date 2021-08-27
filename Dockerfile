@@ -24,7 +24,7 @@ RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm &&
     ./configure --disable-ripd --disable-ripngd --disable-ospfd --disable-ospf6d \
       --disable-ldpd --disable-nhrpd  --disable-babeld --disable-isisd \
       --disable-pimd --disable-pbrd --disable-staticd --disable-vrrpd --disable-pathd && \
-    make -j && make install
+    make && make install
 
 FROM target AS final-image
 
