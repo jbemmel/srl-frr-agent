@@ -221,7 +221,9 @@ IPv6 Unicast route table of network instance default
 0 IPv6 prefixes with active ECMP routes
 ```
 
-Routes from BGP unnumbered peers are distinguished as coming from the "srl_frr_agent", via the NDK.
+Routes from BGP unnumbered peers are distinguished as coming from the "srl_frr_agent", via the NDK. Note that the internal 1.1.0.0/31 route could be suppressed (as would happen if a link local 169.254.x.y address were used instead)
+
+Preference and metric values could be configured if required. Multiple BGP unnumbered interfaces (to different peers) can be supported per network instance
 
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868 (same AS)
 Spine + Leaf:
