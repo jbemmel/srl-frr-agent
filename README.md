@@ -37,6 +37,8 @@ leaf  e1-1.0: 1.1.0.0/31 -> spine = 1.1.0.1 (router ID)
 
 By default, FRR integrates with the Linux kernel and populates a network namespace with the routes it learns. Using a Netlink socket, applications can connect to a namespace and receive events about routes being added or removed.
 
+### Other options to listen for route events
+
 It may also be possible to listen to Zebra's netlink socket directly, see https://zstas.github.io/jekyll/update/2020/02/25/bgp.html - however, the Linux kernel events are more generic, and better documented.
 
 ```
@@ -67,9 +69,12 @@ ipv6 { }
 interface ethernet-1/1.0 bgp-unnumbered-peer-as external
 protocols experimental-frr
 admin-state enable
-bgp enable
 router-id 1.1.0.1
 autonomous-system 65000
+bgp {
+  admin-state enable
+  port 1179
+}
 commit stay
 ```
 Leaf:
@@ -86,13 +91,18 @@ ipv6 { }
 interface ethernet-1/1.0 bgp-unnumbered-peer-as external
 protocols experimental-frr
 admin-state enable
-bgp enable
 router-id 1.1.1.1
 autonomous-system 65001
+bgp {
+  admin-state enable
+  port 1179
+}
 commit stay
 ```
 
-For vtysh access, a shell alias can be configured:
+Note how the FRR BGP process listens on a (configurable) non-default port 1179, instead of 179; this allows FRR and the native SR Linux BGP process to coexist in the same namespace, if needed. A [patch](https://github.com/FRRouting/frr/pull/9513) to enable this configuration for FRR was submitted.
+
+For vtysh access, a shell alias gets configured:
 ```
 environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/"
 ```
@@ -142,6 +152,49 @@ B>* 100.1.0.1/32 [20/0] via fe80::a5:2cff:feff:1, e1-1.0, weight 1, 00:05:52
 C>* 100.1.1.1/32 is directly connected, lo0.0, 00:05:57
 C>* 169.254.1.0/24 is directly connected, gateway, 00:05:57
 ```
+
+On SR Linux side, the routes get instantiated:
+```
+A:spine1# show network-instance default route-table all                                                                                                                                                            
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+IPv4 Unicast route table of network instance default
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
++-------------------------------------+-------+------------+----------------------+----------------------+----------+---------+-----------------------+-----------------------+
+|               Prefix                |  ID   | Route Type |     Route Owner      |      Best/Fib-       |  Metric  |  Pref   |    Next-hop (Type)    |  Next-hop Interface   |
+|                                     |       |            |                      |     status(slot)     |          |         |                       |                       |
++=====================================+=======+============+======================+======================+==========+=========+=======================+=======================+
+| 1.1.0.0/31                          | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 100     | 1.1.1.1 (indirect)    | None                  |
+| 1.1.1.0/31                          | 1     | local      | net_inst_mgr         | True/success         | 0        | 0       | 1.1.1.0 (direct)      | ethernet-1/1.0        |
+| 1.1.1.0/32                          | 1     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
+| 100.1.0.1/32                        | 2     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
+| 100.1.1.1/32                        | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 100     | 1.1.1.1 (indirect)    | None                  |
++-------------------------------------+-------+------------+----------------------+----------------------+----------+---------+-----------------------+-----------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+5 IPv4 routes total
+5 IPv4 prefixes with active routes
+0 IPv4 prefixes with active ECMP routes
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+IPv6 Unicast route table of network instance default
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
++-------------------------------------+-------+------------+----------------------+----------------------+----------+---------+-----------------------+-----------------------+
+|               Prefix                |  ID   | Route Type |     Route Owner      |      Best/Fib-       |  Metric  |  Pref   |    Next-hop (Type)    |  Next-hop Interface   |
+|                                     |       |            |                      |     status(slot)     |          |         |                       |                       |
++=====================================+=======+============+======================+======================+==========+=========+=======================+=======================+
+| ::ffff:1.1.0.0/127                  | 1     | local      | net_inst_mgr         | True/success         | 0        | 0       | ::ffff:1.1.0.1        | ethernet-1/1.0        |
+|                                     |       |            |                      |                      |          |         | (direct)              |                       |
+| ::ffff:1.1.0.1/128                  | 1     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
+| 2001::6401:1/128                    | 2     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
+| 2001::6401:101/128                  | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 100     | ::ffff:1.1.0.0        | None                  |
+|                                     |       |            |                      |                      |          |         | (indirect)            |                       |
++-------------------------------------+-------+------------+----------------------+----------------------+----------+---------+-----------------------+-----------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+4 IPv6 routes total
+4 IPv6 prefixes with active routes
+0 IPv6 prefixes with active ECMP routes
+```
+
+Routes from BGP unnumbered peers are distinguished as coming from the "srl_frr_agent", via the NDK.
 
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868 (same AS)
 Spine + Leaf:
