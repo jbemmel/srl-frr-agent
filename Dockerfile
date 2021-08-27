@@ -13,14 +13,13 @@ RUN sudo yum install -y python3-pyroute2
 #    rm -f /tmp/repo.rpm && sudo yum clean all -y
 
 # Add custom FRR build
-RUN sudo mkdir -p /pkgs/rpm \
-    && sudo yum install -y https://ci1.netdef.org/artifact/LIBYANG-LIBYANGV2/shared/build-2/CentOS-8-x86_64-Packages/libyang2-2.0.0.10.g2eb910e4-1.el8.x86_64.rpm \
+RUN sudo yum install -y https://ci1.netdef.org/artifact/LIBYANG-LIBYANGV2/shared/build-2/CentOS-8-x86_64-Packages/libyang2-2.0.0.10.g2eb910e4-1.el8.x86_64.rpm \
         https://ci1.netdef.org/artifact/RPKI-RTRLIB/shared/build-110/CentOS-7-x86_64-Packages/librtr-0.7.0-1.el7.centos.x86_64.rpm
 
-COPY frr/docker/centos-8/pkgs/x86_64/frr-8.0_git*.el8.x86_64.rpm /pkgs/rpm/
+COPY frr/docker/centos-8/pkgs/x86_64/frr-8.0_git*.el8.x86_64.rpm /tmp/frr8.rpm
 
-RUN sudo yum install -y /pkgs/rpm/*/*.rpm \
-    && sudo rm -rf /pkgs
+RUN sudo yum install -y /tmp/frr8.rpm \
+    && sudo rm -rf /tmp/frr8.rpm
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
 # Issue is that these addresses do not get installed as next hop in the RT
