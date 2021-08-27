@@ -12,9 +12,9 @@ import re
 import ipaddress
 import json
 import signal
+import queue
 import traceback
 import subprocess
-# from concurrent.futures import ThreadPoolExecutor
 import pwd
 
 # sys.path.append('/usr/lib/python3.6/site-packages/sdk_protos')
@@ -151,14 +151,13 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, gnmi_stub ):
 
    # For IPv6, build a /127 based on mapped ipv4 of lowest ID
    lowest_id = min(local_ip,peer_ip)
-   mapped_v4 = '::ffff:' + lowest_id + '/127'
-   v6_subnet = ipaddress.ip_network( mapped_v4, strict=False )
+   mapped_v4 = '2001::ffff:' + lowest_id # Try 'regular' v6
+   v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
-   mapped_v4_ips = [ str(h.ipv4_mapped) for h in v6_subnet.hosts() ]
-   _i = mapped_v4_ips.index(lowest_id)
+   _i = v6_ips.index( str(ipaddress.ip_address(mapped_v4)) )
    local_v6 = v6_ips[ _i if local_ip == lowest_id else (1-_i) ]
    peer_v6  = v6_ips[ (1-_i) if local_ip == lowest_id else _i ]
-   logging.info( f"ConfigurePeerIPMAC v6={v6_ips}[{mapped_v4_ips}] local={local_v6} peer={peer_v6}" )
+   logging.info( f"ConfigurePeerIPMAC v6={v6_ips} local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
    config = {
@@ -247,7 +246,7 @@ def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local,ipv6_nexthop):
     nhg_info.key.network_instance_name = network_instance
     nhg_info.key.name = ipv6_link_local + '_v4_frr_sdk' # Must end with '_sdk'
     nh = nhg_info.data.next_hop.add()
-    nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT
+    nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT? LOCAL?
     nh.type = nexthop_group_service_pb2.NextHop.REGULAR
     nh.ip_nexthop.addr = ipaddress.ip_address(ip_nexthop).packed
 
@@ -303,8 +302,12 @@ def SDK_DelRoute(network_instance,ip_addr,prefix_len):
 def Add_Route(network_instance, netlink_msg):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
-    # priority = netlink_msg['attrs'][2][1] # RTA_priority -> preference ?
-    via_v6 = netlink_msg['attrs'][4][1]['addr'] # RTA_VIA
+    # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
+    att4 = netlink_msg['attrs'][4]
+    if att4[0] == "RTA_VIA":
+       via_v6 = att4[1]['addr'] # RTA_VIA, ipv4
+    else:
+       via_v6 = att4[1] # RTA_GATEWAY, ipv6
     logging.info( f"Add_Route {prefix}/{length}" )
     return SDK_AddRoute(network_instance,prefix,length,via_v6)
 
@@ -334,6 +337,9 @@ class MonitoringThread(Thread):
 
       logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
 
+      # Need to register callback before connecting FRR, but postpone processing
+      # of route add/del events by queuing them
+      work_queue = queue.Queue()
       try:
          global ipdb
          ipdb = IPDB(nl=NetNS(f'srbase-{self.net_inst}'))
@@ -341,9 +347,11 @@ class MonitoringThread(Thread):
          def netlink_callback(ipdb, msg, action):
              logging.info(f"IPDB callback msg={msg} action={action}")
              if action=="RTM_NEWROUTE" and msg['proto'] == 186: # BGP route
-                Add_Route(self.net_inst,msg)
+                logging.info( "Queue: Add_Route" )
+                work_queue.put( (action,msg) ) # Could enqueue method ptr here
              elif action=="RTM_DELROUTE" and msg['proto'] == 186: # BGP route
-                Del_Route(self.net_inst,msg)
+                logging.info( "Queue: Del_Route" )
+                work_queue.put( (action,msg) )
              else:
                 logging.info( f"Ignoring: {action}" )
 
@@ -352,8 +360,9 @@ class MonitoringThread(Thread):
          logging.error( f"Exception while starting IPDB callback: {ex}" )
 
       try:
-        while self.interfaces != []:
-         for _i in self.interfaces:
+        todo = self.interfaces
+        while todo != []:
+          for _i in todo:
             _get_peer = f'show bgp neighbors {_i} json'
             json_data = run_vtysh( ns=self.net_inst, show=[_get_peer] )
             if json_data:
@@ -372,17 +381,29 @@ class MonitoringThread(Thread):
                       peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       SDK_AddNHG( self.net_inst, peerId, neighbor, peer_v6 )
-                      self.interfaces.remove( _i )
+                      todo.remove( _i )
+                      logging.info( f"MonitoringThread done with {_i}, left={todo}" )
 
-         time.sleep(10)
+          time.sleep(10)
+          logging.info( f"MonitoringThread wakes up left={todo}" )
       except Exception as e:
          logging.error(e)
 
-      # After setting up the BGP peering, monitor route events
-      self.daemon = True
-
-      # This thread does nothing but waiting for signals - needed?
-      signal.pause()
+      # After setting up the BGP peering, process route events
+      logging.info( f"MonitoringThread {self.net_inst} starts processing events...queue={work_queue.qsize()}" )
+      # self.daemon = True
+      while True:
+         try:
+            action, msg = work_queue.get()
+            logging.info( f"MonitoringThread {self.net_inst} got event: {action}" )
+            if action == "RTM_NEWROUTE":
+               Add_Route( self.net_inst, msg )
+            elif action == "RTM_DELROUTE":
+               Del_Route( self.net_inst, msg )
+            work_queue.task_done()
+         except Exception as ex:
+           traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
+           logging.error( f"Exception while processing {action}: {ex} {traceback_str}" )
 
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
