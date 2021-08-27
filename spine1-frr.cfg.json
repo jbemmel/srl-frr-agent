@@ -311,6 +311,22 @@
               }
             }
           },
+	  {
+            "sequence-id": 195,
+            "description": "Accept incoming FRR BGP when the other router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": "tcp",
+              "destination-port": {
+                "operator": "eq",
+                "value": 1179
+              }
+            }
+          },
           {
             "sequence-id": 200,
             "description": "Accept incoming BGP when this router initiates the TCP connection",

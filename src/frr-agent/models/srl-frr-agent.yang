@@ -55,16 +55,24 @@ module srl-frr-agent {
 
                     Disable causes all BGP sessions to be taken down immediately, even if admin-state at the group or neighbor level of some of these sessions is still set as enable.";
             }
-            leaf bgp {
+            container bgp {
+              presence "Configure BGP";
+              leaf admin-state {
                 type srl_nokia-comm:admin-state;
                 default "enable";
 
                 description
                     "Administratively enable or disable the FRR BGP daemon";
+              }
 
-                must ". = 'disable' or not(../../bgp)" {
-                   error-message "Either Nokia BGP or FRR BGP can be configured for a network-instance, not both";
+              leaf port {
+                type uint16;
+                default 1179;
+                description "TCP port for FRR bgpd to listen on, default 1179 (non-standard)";
+                must ". != 179 or not(../../../bgp)" {
+                   error-message "If Nokia BGP is configured, FRR BGP cannot use TCP port 179 in the same network-instance";
                 }
+              }
             }
             container eigrp {
               presence "Configure EIGRP";

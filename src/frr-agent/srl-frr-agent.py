@@ -446,13 +446,16 @@ def Handle_Notification(obj, state):
                 if 'router_id' in data:
                     params[ "router_id" ] = data['router_id']['value']
                 if 'bgp' in data:
-                    params[ "bgp" ] = data['bgp'][4:]
-                    if params[ "bgp" ] == "enable":
-                       enabled_daemons.append( "bgpd" )
+                    bgp = data['bgp']
+                    if 'admin_state' in bgp:
+                      params[ "bgp" ] = bgp['admin_state'][12:]
+                      if params[ "bgp" ] == "enable":
+                        enabled_daemons.append( "bgpd" )
+                    params[ "frr_bgpd_port" ] = int( bgp['port'] ) if 'port' in bgp else 1179
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
                     if 'admin_state' in eigrp:
-                      params[ "eigrp" ] = data['admin_state'][12:]
+                      params[ "eigrp" ] = eigrp['admin_state'][12:]
                       if params[ "eigrp" ] == "enable":
                          enabled_daemons.append( "eigrpd" )
                     if 'create_veth_multicast_bypass' in eigrp:
@@ -482,6 +485,8 @@ def Handle_Notification(obj, state):
                     for name,peer_as in ni['interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
+                        # Use configured BGP port, custom patch
+                        lines += f'neighbor {name} port {params[ "frr_bgpd_port" ]}\n '
                         interfaces.append( name )
                     params[ "bgp_neighbor_lines"] = lines
 

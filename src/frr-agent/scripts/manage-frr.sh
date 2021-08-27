@@ -51,6 +51,9 @@ for daemon in ${enabled_daemons}; do
  sed -i "s/^\${daemon}=no/\${daemon}=yes/g" "${DIR}/daemons"
 done
 
+# Configure custom port for bgpd
+sed -i "s/bgpd_options=\"   -A 127.0.0.1\"/bgpd_options=\"   -A 127.0.0.1 --bgp_port ${frr_bgpd_port}\"/g" "${DIR}/daemons"
+
 if [[ "$openfabric" == "enable" ]]; then
 
 if [[ "$openfabric_domain_password" != "" ]]; then
