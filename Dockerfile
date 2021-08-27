@@ -8,15 +8,15 @@ RUN sudo yum install -y python3-pyroute2
 FROM centos:8 AS build-frr-with-flexible-ports
 
 # Install build tools, frr-stable is for libyang2-devel
-# RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm && \
-#  yum localinstall -y frr-stable-repo-1-0.el8.noarch.rpm && \
-# TODO --enable-protobuf --enable-grpc libyang2-devel protobuf-c-devel
-RUN dnf -y group install "Development Tools" && \
+# TODO --enable-protobuf --enable-grpc protobuf-c-devel
+RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm && \
+  yum localinstall -y frr-stable-repo-1-0.el8.noarch.rpm && \
+  dnf -y group install "Development Tools" && \
   yum config-manager --set-enabled powertools && \
   dnf install -y --enablerepo=powertools git autoconf pcre-devel \
   automake libtool make readline-devel texinfo net-snmp-devel pkgconfig \
   groff pkgconfig json-c-devel pam-devel bison flex python2-pytest \
-  c-ares-devel python2-devel libcap-devel \
+  c-ares-devel python2-devel libcap-devel libyang2-devel \
   elfutils-libelf-devel && \
     git clone --branch jvb-allow-custom-port-for-interface-neighbor https://github.com/exergy-connect/frr.git && \
     cd frr && \
