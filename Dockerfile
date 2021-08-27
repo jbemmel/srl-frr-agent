@@ -8,7 +8,7 @@ RUN sudo yum install -y python3-pyroute2
 FROM centos:8 AS build-frr-with-flexible-ports
 
 # Install build tools
-RUN yum install -y gcc-c++ git autoconf make openssl-devel && \
+RUN yum install -y gcc-c++ git autoconf automake make openssl-devel && \
     git clone --branch jvb-allow-custom-port-for-interface-neighbor https://github.com/exergy-connect/frr.git && \
     cd frr && \
     ./bootstrap.sh && \
