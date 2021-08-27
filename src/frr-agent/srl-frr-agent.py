@@ -451,7 +451,7 @@ def Handle_Notification(obj, state):
                       params[ "bgp" ] = bgp['admin_state'][12:]
                       if params[ "bgp" ] == "enable":
                         enabled_daemons.append( "bgpd" )
-                    params[ "frr_bgpd_port" ] = int( bgp['port'] ) if 'port' in bgp else 1179
+                    params[ "frr_bgpd_port" ] = bgp['port']['value'] if 'port' in bgp else "1179"
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
                     if 'admin_state' in eigrp:
@@ -481,14 +481,15 @@ def Handle_Notification(obj, state):
 
                 if net_inst in state.network_instances:
                     ni = state.network_instances[ net_inst ]
-                    lines = ""
-                    for name,peer_as in ni['interfaces'].items():
+                    if "bgpd" in enabled_daemons:
+                      lines = ""
+                      for name,peer_as in ni['interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         # Use configured BGP port, custom patch
                         lines += f'neighbor {name} port {params[ "frr_bgpd_port" ]}\n '
                         interfaces.append( name )
-                    params[ "bgp_neighbor_lines"] = lines
+                      params[ "bgp_neighbor_lines"] = lines
 
                     if 'openfabric_name' in params:
                       _of = params['openfabric_name' ]

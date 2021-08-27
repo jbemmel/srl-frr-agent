@@ -891,6 +891,22 @@
               }
             }
           },
+	  {
+            "sequence-id": 225,
+            "description": "Accept incoming FRR BGP when the other router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "next-header": "tcp",
+              "destination-port": {
+                "operator": "eq",
+                "value": 1179
+              }
+            }
+          },
           {
             "sequence-id": 230,
             "description": "Accept incoming BGP when this router initiates the TCP connection",
@@ -1419,9 +1435,11 @@
       "protocols": {
         "srl-frr-agent:experimental-frr": {
           "admin-state": "enable",
-          "bgp": "enable",
           "autonomous-system": 65000,
-          "router-id": "1.1.0.1"
+          "router-id": "1.1.0.1",
+	  "bgp": {
+            "admin-state": "enable"
+          }
         }
       }
     },
