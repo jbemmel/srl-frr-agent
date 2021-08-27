@@ -1,12 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
 
-#
-# TODO: Add CLI command to open vtysh: /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/
-# or simply alias:
-# environment alias vtysh "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-default/"
-#
-
 import grpc
 import datetime
 import time
@@ -32,11 +26,10 @@ import route_service_pb2
 import route_service_pb2_grpc
 import nexthop_group_service_pb2
 import nexthop_group_service_pb2_grpc
-import networkinstance_service_pb2
 
 import sdk_common_pb2
 
-# To report state back
+# To report state back, TODO
 import telemetry_service_pb2
 import telemetry_service_pb2_grpc
 
@@ -92,9 +85,6 @@ def Subscribe(stream_id, option):
     elif option == 'nexthop_group':
         entry = nexthop_group_service_pb2.NextHopGroupSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, nhg=entry)
-    elif option == 'nw_inst':
-        entry = networkinstance_service_pb2.NetworkInstanceSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, nw_inst=entry)
 
     subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
     print('Status of subscription response for {}:: {}'.format(option, subscription_response.status))
@@ -112,8 +102,7 @@ def Subscribe_Notifications(stream_id):
 
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
-    Subscribe(stream_id, 'nexthop_group')
-    Subscribe(stream_id, 'nw_inst')
+    # Subscribe(stream_id, 'nexthop_group')
 
 #
 # Uses gNMI to get /platform/chassis/mac-address and format as hhhh.hhhh.hhhh
@@ -153,12 +142,23 @@ def ipv6_2_mac(ipv6):
 
     return ":".join(macParts)
 
-def ConfigurePeerIPMAC( intf, peer_ip, mac, gnmi_stub ):
-   logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac}" )
+def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, gnmi_stub ):
+   logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
    subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
    ips = list( map( str, subnet.hosts() ) )
+
+   # For IPv6, build a /127 based on mapped ipv4 of lowest ID
+   lowest_id = min(local_ip,peer_ip)
+   mapped_v4 = '::ffff:' + lowest_id + '/127'
+   v6_subnet = ipaddress.ip_network( mapped_v4, strict=False )
+   v6_ips = list( map( str, v6_subnet.hosts() ) )
+   mapped_v4_ips = [ str(h.ipv4_mapped) for h in v6_subnet.hosts() ]
+   _i = mapped_v4_ips.index(lowest_id)
+   local_v6 = v6_ips[ _i if local_ip == lowest_id else (1-_i) ]
+   peer_v6  = v6_ips[ (1-_i) if local_ip == lowest_id else _i ]
+   logging.info( f"ConfigurePeerIPMAC v6={v6_ips}[{mapped_v4_ips}] local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
    config = {
@@ -181,15 +181,17 @@ def ConfigurePeerIPMAC( intf, peer_ip, mac, gnmi_stub ):
      },
      "ipv6" : {
         "address" : [
-           # Use ipv4 mapped address
-           { "ip-prefix" : "::ffff:" + ips[ 0 if peer_ip == ips[1] else 1 ] + "/127",
+           # Use ipv4 mapped address, /127 around lowest of router IDs
+           { "ip-prefix" : local_v6 + "/127",
              "primary": '[null]'  # type 'empty'
            }
         ]
      }
    }
-   return gNMI_Set( gnmi_stub, path, config )
+   gNMI_Set( gnmi_stub, path, config )
+   return peer_v6
 
+# Works, but no longer used
 def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
     path = f'/network-instance[name={net_inst}]/next-hop-groups'
     config = {
@@ -236,7 +238,7 @@ def gNMI_Set( gnmi_stub, path, data ):
              return res
          raise err
 
-def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local):
+def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local,ipv6_nexthop):
     nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
     nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
 
@@ -249,14 +251,16 @@ def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local):
     nh.type = nexthop_group_service_pb2.NextHop.REGULAR
     nh.ip_nexthop.addr = ipaddress.ip_address(ip_nexthop).packed
 
-    # IPv6, SRL does not allow link local address to be used directly
+    # IPv6
     nhg_info = nh_request.group_info.add()
     nhg_info.key.network_instance_name = network_instance
     nhg_info.key.name = ipv6_link_local + '_v6_frr_sdk' # Must end with '_sdk'
     nh = nhg_info.data.next_hop.add()
     nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT
     nh.type = nexthop_group_service_pb2.NextHop.REGULAR
-    nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_link_local).packed
+
+    # SRL does not allow link local address to be used as NH, use mapped ipv4
+    nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
 
     logging.info(f"NH_REQUEST :: {nh_request}")
     nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
@@ -267,6 +271,7 @@ def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6):
     route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
     route_request = route_service_pb2.RouteAddRequest()
     route_info = route_request.routes.add()
+    # Could configure defaults for these in the agent Yang params
     # route_info.data.preference = ip['preference']
     # route_info.data.metric = ip['metric']
     route_info.key.net_inst_name = network_instance
@@ -275,14 +280,30 @@ def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6):
     route_info.key.ip_prefix.prefix_length = int(prefix_len)
     route_info.data.nexthop_group_name = via_v6 + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
 
-    logging.info(f"ROUTE REQUEST :: {route_request}")
+    logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
     route_response = route_stub.RouteAddOrUpdate(request=route_request,metadata=metadata)
-    logging.info(f"ROUTE RESPONSE:: {route_response.status} {route_response.error_str}")
+    logging.info(f"RouteAddOrUpdate RESPONSE:: {route_response.status} {route_response.error_str}")
+    return route_response.status != 0
+
+def SDK_DelRoute(network_instance,ip_addr,prefix_len):
+    route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
+    route_request = route_service_pb2.RouteDeleteRequest()
+    route_info = route_request.routes.add()
+    route_info.net_inst_name = network_instance
+    ip = ipaddress.ip_address(ip_addr)
+    route_info.ip_prefix.ip_addr.addr = ip.packed
+    route_info.ip_prefix.prefix_length = int(prefix_len)
+    # route_info.data.nexthop_group_name = no need to set this
+
+    logging.info(f"RouteDeleteRequest REQUEST :: {route_request}")
+    route_response = route_stub.RouteDelete(request=route_request,metadata=metadata)
+    logging.info(f"RouteDeleteRequest RESPONSE:: {route_response.status} {route_response.error_str}")
     return route_response.status != 0
 
 def Add_Route(network_instance, netlink_msg):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
+    # priority = netlink_msg['attrs'][2][1] # RTA_priority -> preference ?
     via_v6 = netlink_msg['attrs'][4][1]['addr'] # RTA_VIA
     logging.info( f"Add_Route {prefix}/{length}" )
     return SDK_AddRoute(network_instance,prefix,length,via_v6)
@@ -291,7 +312,7 @@ def Del_Route(network_instance, netlink_msg):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
     logging.info( f"Del_Route {prefix}/{length}" )
-    return
+    return SDK_DelRoute(network_instance,prefix,length)
 
 #
 # Runs as a separate thread
@@ -340,6 +361,7 @@ class MonitoringThread(Thread):
                 if _i in _js:
                    i = _js[ _i ]
                    neighbor = i['bgpNeighborAddr'] #ipv6 link-local
+                   localId = i['localRouterId']
                    peerId = i['remoteRouterId']
                    if neighbor!="none" and peerId!="0.0.0.0":
                       # dont have the MAC address, but can derive it from ipv6 link local
@@ -347,9 +369,9 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      ConfigurePeerIPMAC( _i, peerId, mac, gnmi_stub )
+                      peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
-                      SDK_AddNHG( self.net_inst, peerId, neighbor )
+                      SDK_AddNHG( self.net_inst, peerId, neighbor, peer_v6 )
                       self.interfaces.remove( _i )
 
          time.sleep(10)
@@ -548,30 +570,6 @@ def Handle_Notification(obj, state):
     # dont subscribe to LLDP now
     return False
 
-#
-# Test: adding a link local nexthop 169.254.0.1 via the NDK
-#
-def TestAddLinkLocal_Nexthop_Group(name,nh_ip,net_inst='default'):
-    nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
-    #if action =='replace':
-    #    nhg_stub.SyncStart(request=sdk_common_pb2.SyncRequest(),metadata=metadata)
-    nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
-    nhg_info = nh_request.group_info.add()
-    nhg_info.key.network_instance_name = net_inst
-    nhg_info.key.name = name + '_sdk' # Must end with '_sdk'
-    nh = nhg_info.data.next_hop.add()
-    ip = ipaddress.ip_address(nh_ip) # Like Zebra creates
-    nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT # or INDIRECT or LOCAL
-    nh.ip_nexthop.addr = ip.packed
-
-    logging.info(f"NH_REQUEST :: {nh_request}")
-    nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
-    logging.info(f"NH RESPONSE:: {nhg_response}")
-    logging.info(f"NHG status:{nhg_response.status}")
-    logging.info(f"NHG error:{nhg_response.error_str}")
-
-    return nhg_response.status == 0
-
 ###########################
 # Invokes gnmic client to update router configuration, via bash script
 ###########################
@@ -616,10 +614,10 @@ class State(object):
         return str(self.__class__) + ": " + str(self.__dict__)
 
 ##################################################################################################
-## This is the main proc where all processing for auto_config_agent starts.
+## This is the main proc where all processing for FRR agent starts.
 ## Agent registration, notification registration, Subscrition to notifications.
 ## Waits on the subscribed Notifications and once any config is received, handles that config
-## If there are critical errors, Unregisters the fib_agent gracefully.
+## If there are critical errors, unregisters the agent gracefully.
 ##################################################################################################
 def Run():
     sub_stub = sdk_service_pb2_grpc.SdkNotificationServiceStub(channel)
@@ -652,10 +650,6 @@ def Run():
                     logging.info('TO DO -commit.end config')
                 else:
                     Handle_Notification(obj, state)
-
-                    # Program router_id only when changed
-                    # if state.router_id != old_router_id:
-                    #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
                     logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:

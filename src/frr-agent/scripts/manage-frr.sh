@@ -99,6 +99,9 @@ router bgp $autonomous_system
  ! It's possible to define peer groups for scaling, not currently used
  ! neighbor V4 peer-group
 
+ ! Both SRL and FRR are sending ipv6 neighbor discovery packets, should disable
+ ! but https://github.com/FRRouting/frr/issues/7738 issue prevents that
+
  ! Blob of configured interfaces for this network-instance, provided by Python
  ! Each line looks like this:
  ! neighbor e1-1.0 interface remote-as [peer-as]
