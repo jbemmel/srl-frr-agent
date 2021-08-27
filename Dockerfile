@@ -17,7 +17,7 @@ RUN mkdir -p /pkgs/rpm \
     && yum install -y https://ci1.netdef.org/artifact/LIBYANG-LIBYANGV2/shared/build-2/CentOS-8-x86_64-Packages/libyang2-2.0.0.10.g2eb910e4-1.el8.x86_64.rpm \
         https://ci1.netdef.org/artifact/RPKI-RTRLIB/shared/build-110/CentOS-7-x86_64-Packages/librtr-0.7.0-1.el7.centos.x86_64.rpm
 
-COPY frr/docker/centos-8/pkgs/x86_64/frr-8.0_git*.el8.x86_64.rpm /rpmbuild/RPMS/ /pkgs/rpm/
+COPY frr/docker/centos-8/pkgs/x86_64/frr-8.0_git*.el8.x86_64.rpm /pkgs/rpm/
 
 RUN yum install -y /pkgs/rpm/*/*.rpm \
     && rm -rf /pkgs
