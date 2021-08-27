@@ -18,11 +18,10 @@ RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm &&
   groff pkgconfig json-c-devel pam-devel bison flex python2-pytest \
   c-ares-devel python2-devel libcap-devel libyang2-devel \
   elfutils-libelf-devel && \
-    git clone --branch jvb-allow-custom-port-for-interface-neighbor https://github.com/exergy-connect/frr.git && \
+    git clone --branch stable/8.0 https://github.com/exergy-connect/frr.git && \
     cd frr && \
     ./bootstrap.sh && \
-    ./configure --enable-datacenter \
-      --disable-ripd --disable-ripngd --disable-ospfd --disable-ospf6d \
+    ./configure --disable-ripd --disable-ripngd --disable-ospfd --disable-ospf6d \
       --disable-ldpd --disable-nhrpd  --disable-babeld --disable-isisd \
       --disable-pimd --disable-pbrd --disable-staticd --disable-vrrpd --disable-pathd && \
     make -j && make install
