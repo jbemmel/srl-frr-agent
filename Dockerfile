@@ -29,6 +29,9 @@ FROM target AS final-image
 #    sudo chmod 644 /etc/frr/daemons && \
 #    rm -f /tmp/repo.rpm && sudo yum clean all -y
 
+# Add custom FRR build
+COPY --from=build-frr-with-flexible-ports /usr/local/ /usr/local/
+
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
 # Issue is that these addresses do not get installed as next hop in the RT
 # RUN sudo sed -i.orig "s/'169.254.'/'169.254.1.'/g" /opt/srlinux/models/srl_nokia/models/interfaces/srl_nokia-if-ip.yang
