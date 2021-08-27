@@ -17,3 +17,11 @@ build:
 	                  --build-arg SR_LINUX_RELEASE="${SR_LINUX_RELEASE}" \
 	                  -f ./Dockerfile -t ${IMG} .
 	sudo docker tag ${IMG} ${LATEST}
+
+# Build FRR with  support for non-default BGP ports for unnumbered interfaces
+# Produces ./docker/centos-8/pkgs/x86_64/frr-8.0_git<xxx>.el8.x86_64.rpm
+# TODO could disable daemons that are not used/needed
+frr:
+	git clone --branch stable/8.0 https://github.com/exergy-connect/frr.git && \
+	cd frr && \
+	sudo DOCKER_BUILDKIT=1 docker/centos-8/build.sh

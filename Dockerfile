@@ -3,31 +3,6 @@ FROM srl/custombase:$SR_LINUX_RELEASE AS target
 
 RUN sudo yum install -y python3-pyroute2
 
-# Build FRR with  support for non-default BGP ports for unnumbered interfaces
-# Use separate build image and copy only resulting binaries, else 3.4GB
-FROM centos:8 AS build-frr-with-flexible-ports
-
-# Install build tools, frr-stable is for libyang2-devel
-# TODO --enable-protobuf --enable-grpc protobuf-c-devel
-RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm && \
-  yum localinstall -y frr-stable-repo-1-0.el8.noarch.rpm && \
-  dnf -y group install "Development Tools" && \
-  yum config-manager --set-enabled powertools && \
-  dnf install -y --enablerepo=powertools git autoconf pcre-devel \
-  automake libtool make readline-devel texinfo net-snmp-devel pkgconfig \
-  groff pkgconfig json-c-devel pam-devel bison flex python2-pytest \
-  c-ares-devel python2-devel libcap-devel libyang2-devel \
-  elfutils-libelf-devel && \
-    git clone --branch stable/8.0 https://github.com/exergy-connect/frr.git && \
-    cd frr && \
-    ./bootstrap.sh && \
-    ./configure --disable-ripd --disable-ripngd --disable-ospfd --disable-ospf6d \
-      --disable-ldpd --disable-nhrpd  --disable-babeld --disable-isisd \
-      --disable-pimd --disable-pbrd --disable-staticd --disable-vrrpd --disable-pathd && \
-    make && make install
-
-FROM target AS final-image
-
 # Install FRR stable, enable BGP daemon
 # frr-stable or frr-8 or frr-7
 #    sudo sed -i 's|el8/frr8|el8/frr8.freeze|g' /etc/yum.repos.d/frr-8.repo && \
@@ -38,7 +13,14 @@ FROM target AS final-image
 #    rm -f /tmp/repo.rpm && sudo yum clean all -y
 
 # Add custom FRR build
-COPY --from=build-frr-with-flexible-ports /usr/local/ /usr/local/
+RUN mkdir -p /pkgs/rpm \
+    && yum install -y https://ci1.netdef.org/artifact/LIBYANG-LIBYANGV2/shared/build-2/CentOS-8-x86_64-Packages/libyang2-2.0.0.10.g2eb910e4-1.el8.x86_64.rpm \
+        https://ci1.netdef.org/artifact/RPKI-RTRLIB/shared/build-110/CentOS-7-x86_64-Packages/librtr-0.7.0-1.el7.centos.x86_64.rpm
+
+COPY frr/docker/centos-8/pkgs/x86_64/frr-8.0_git*.el8.x86_64.rpm /rpmbuild/RPMS/ /pkgs/rpm/
+
+RUN yum install -y /pkgs/rpm/*/*.rpm \
+    && rm -rf /pkgs
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
 # Issue is that these addresses do not get installed as next hop in the RT
