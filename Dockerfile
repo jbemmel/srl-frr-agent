@@ -7,34 +7,21 @@ RUN sudo yum install -y python3-pyroute2
 # Use separate build image and copy only resulting binaries, else 3.4GB
 FROM centos:8 AS build-frr-with-flexible-ports
 
-# Install build tools for gRPC
-RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
-
-# Need to upgrade pip and setuptools
-RUN pip3 install --upgrade pip setuptools
-
-RUN cd /tmp && yum install -y git python3-devel && \
-  pip3 install --upgrade pip && \
-  git clone https://github.com/jbemmel/grpc.git && \
-  cd grpc && \
-  git submodule update --init && \
-  python3 -m pip install -r requirements.txt && \
-  GRPC_PYTHON_BUILD_WITH_CYTHON=1 python3 -m pip install .
-
 # Install build tools, frr-stable is for libyang2-devel
-RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm && \
-  yum localinstall -y frr-stable-repo-1-0.el8.noarch.rpm && \
-  dnf -y group install "Development Tools" && \
+# RUN curl -O https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm && \
+#  yum localinstall -y frr-stable-repo-1-0.el8.noarch.rpm && \
+# TODO --enable-protobuf --enable-grpc libyang2-devel protobuf-c-devel
+RUN dnf -y group install "Development Tools" && \
   yum config-manager --set-enabled powertools && \
   dnf install -y --enablerepo=powertools git autoconf pcre-devel \
   automake libtool make readline-devel texinfo net-snmp-devel pkgconfig \
   groff pkgconfig json-c-devel pam-devel bison flex python2-pytest \
-  c-ares-devel python2-devel libcap-devel protobuf-c-devel libyang2-devel \
+  c-ares-devel python2-devel libcap-devel \
   elfutils-libelf-devel && \
     git clone --branch jvb-allow-custom-port-for-interface-neighbor https://github.com/exergy-connect/frr.git && \
     cd frr && \
     ./bootstrap.sh && \
-    ./configure --enable-protobuf --enable-datacenter --enable-grpc \
+    ./configure --enable-datacenter \
       --disable-ripd --disable-ripngd --disable-ospfd --disable-ospf6d \
       --disable-ldpd --disable-nhrpd  --disable-babeld --disable-isisd \
       --disable-pimd --disable-pbrd --disable-staticd --disable-vrrpd --disable-pathd && \
