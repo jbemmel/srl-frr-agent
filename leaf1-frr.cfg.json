@@ -343,6 +343,22 @@
               }
             }
           },
+	  {
+            "sequence-id": 205,
+            "description": "Accept incoming FRR BGP when this router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": "tcp",
+              "source-port": {
+                "operator": "eq",
+                "value": 1179
+              }
+            }
+          },
           {
             "sequence-id": 210,
             "description": "Accept incoming HTTPS(JSON-RPC) when the other host initiates the TCP connection",
@@ -908,6 +924,22 @@
               "source-port": {
                 "operator": "eq",
                 "value": 179
+              }
+            }
+          },
+	  {
+            "sequence-id": 235,
+            "description": "Accept incoming FRR BGP when this router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "next-header": "tcp",
+              "source-port": {
+                "operator": "eq",
+                "value": 1179
               }
             }
           },
