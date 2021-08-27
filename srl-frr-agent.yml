@@ -1,7 +1,7 @@
 # See example_config.yml for an explanation of all the accepted fields
 srl_frr_agent:
    path: /opt/srlinux/agents/frr-agent
-   launch-command: /opt/srlinux/agents/frr-agent/scripts/srl-frr-agent.sh
+   launch-command: sudo /opt/srlinux/agents/frr-agent/scripts/srl-frr-agent.sh
    search-command: python3 /opt/srlinux/agents/frr-agent/srl-frr-agent.py
    wait-for-config: Yes
    failure-threshold: 100
