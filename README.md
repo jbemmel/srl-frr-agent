@@ -7,7 +7,7 @@ The [adjacent possible](https://understandinginnovation.blog/2019/01/03/explorin
 
 FRR supports BGP unnumbered ([RFC5549](https://datatracker.ietf.org/doc/html/rfc5549)). The idea is to limit the use of statically assigned addresses to just an IPv4 router ID on a loopback interface, combined with auto-assigned (SLAAC) link-local IPv6 addresses on interfaces. Peer AS numbers are automatically discovered, and BGP extended next-hop encoding is used to advertise IPv4 routes with an IPv6 next hop.
 
-FRR by default puts its routes in the Linux kernel, and it is possible to listen for Netlink events to receive changes (see sample Python code).
+FRR by default puts its routes in the Linux kernel, and it is possible to listen for Netlink events to receive changes (see [Python code](https://github.com/jbemmel/srl-frr-agent/blob/main/src/frr-agent/srl-frr-agent.py#L346)).
 Using the 'zebra' protocol, 'ip neighbor' shows how a custom static ARP entry for '169.254.0.1' gets inserted to resolve the (dummy) IPv4 next hop:
 ```
 [root@leaf1 frr]# ip neig
@@ -24,7 +24,14 @@ On the peer, the _exact same address_ is used:
 fe80::9f:7fff:feff:1 dev e1-1.0 lladdr 02:9f:7f:ff:00:01 router REACHABLE
 ...
 ```
-SR Linux does not allow configuration of link-local addresses on interfaces, and next hops with such addresses are currently ignored. Therefore, this demo agent instead creates a pair of /31 IPv4 addresses based on the peer's IPv4 router ID, and assigns that to the interface after the automatic IPv6 BGP peering session is established.
+SR Linux does not allow configuration of link-local addresses on interfaces, and next hops with such addresses (ipv4/v6) are currently ignored. Therefore, this demo agent instead assigns a pair of /31 IPv4 addresses based on the peer's IPv4 router ID, and assigns that to the interface after the automatic IPv6 BGP peering session is established.
+Similarly, a mapped IPv4 local /127 peer link is provisioned for IPv6, using the lowest router ID as a base (+1 or -1 for the peer IP).
+
+The IPv4 addresses are asymmetrical, as they are only used to lookup the MAC address of the next hop:
+```
+spine e1-1.0: 1.1.1.0/31 -> leaf  = 1.1.1.1 (router ID)
+leaf  e1-1.0: 1.1.0.0/31 -> spine = 1.1.0.1 (router ID)
+```
 
 ## Populating the data path: adding routes using the SR Linux NDK
 
