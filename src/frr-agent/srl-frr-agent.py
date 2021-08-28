@@ -433,6 +433,9 @@ def Handle_Notification(obj, state):
         # ConfigurePeerIPMAC( "e1-1.0", "1.2.3.4", "00:11:22:33:44:55" )
 
         net_inst = obj.config.key.keys[0] # e.g. "default"
+        if net_inst == "mgmt":
+            return None
+
         ni = state.network_instances[ net_inst ] if net_inst in state.network_instances else {}
         if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
@@ -718,7 +721,7 @@ def Run():
                 else:
                     netns = Handle_Notification(obj, state)
                     logging.info(f'Updated state after {netns}: {state}')
-                    if netns is not None:
+                    if netns in state.network_instances: # filter mgmt and other irrelevant ones
                         modified.append( netns )
 
     except grpc._channel._Rendezvous as err:
