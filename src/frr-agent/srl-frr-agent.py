@@ -420,41 +420,52 @@ class MonitoringThread(Thread):
 
 
 ##################################################################
-## Proc to process the config Notifications received by auto_config_agent
-## At present processing config from js_path containing agent_name
+## Updates configuration state based on 'config' notifications
+## May calls vtysh to update an interface
+##
+## Return: network instance that was updated
 ##################################################################
 def Handle_Notification(obj, state):
-    if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
+    if obj.HasField('config'):
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
 
         # Tested on main thread
         # ConfigurePeerIPMAC( "e1-1.0", "1.2.3.4", "00:11:22:33:44:55" )
 
         net_inst = obj.config.key.keys[0] # e.g. "default"
+        ni = state.network_instances[ net_inst ] if net_inst in state.network_instances else {}
         if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             # Could define NETNS here: "NETNS" : f'srbase-{net_inst}'
             params = { "network_instance" : net_inst }
-            interfaces = []
+            restartFRR = False
+
+            def updateParam(p,v):
+                params[ p ] = v
+                needRestart = True if (p not in ni or ni[p]!=v) else restartFRR
+                logging.info(f"updateParam {p}='{v}' -> requires restart={needRestart} pending={restartFRR}")
+                return needRestart
+
             if obj.config.op == 2:
                 logging.info(f"Delete config scenario")
                 # TODO if this is the last namespace, unregister?
                 # response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
                 # logging.info( f'Handle_Config: Unregister response:: {response}' )
                 # state = State() # Reset state, works?
-                params[ "admin_state" ] = "disable" # Only stop service for this namespace
-                state.network_instances.pop( net_inst, None )
+                restartFRR = updateParam( "admin_state", "disable" )
+                # state.network_instances.pop( net_inst, None )
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
                 enabled_daemons = []
                 if 'admin_state' in data:
-                    params[ "admin_state" ] = data['admin_state'][12:]
+                    restartFRR = updateParam( "admin_state", data['admin_state'][12:] )
                 if 'autonomous_system' in data:
-                    params[ "autonomous_system" ] = data['autonomous_system']['value']
+                    restartFRR = updateParam( "autonomous_system", data['autonomous_system']['value'] )
                 if 'router_id' in data:
-                    params[ "router_id" ] = data['router_id']['value']
+                    restartFRR = updateParam( "router_id", data['router_id']['value'] )
+
                 if 'bgp' in data:
                     bgp = data['bgp']
                     if 'admin_state' in bgp:
@@ -494,14 +505,12 @@ def Handle_Notification(obj, state):
                    params[ "openfabric" ] = "disable"
 
                 # Could dynamically create CPM filter for IP proto 88
-
-                if net_inst in state.network_instances:
-                    ni = state.network_instances[ net_inst ]
+                if ni != {}:
                     if "bgpd" in enabled_daemons:
                       lines = ""
                       routemap = ""
                       entry = 10
-                      for name,peer_as in ni['interfaces'].items():
+                      for name,peer_as in ni['bgp_interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         # Use configured BGP port, custom patch
@@ -512,7 +521,6 @@ def Handle_Notification(obj, state):
                         routemap += f' match interface {name}\n'
                         entry += 10
 
-                        interfaces.append( name )
                       routemap += f'route-map drop_interface_routes permit {entry}'
                       params[ "bgp_neighbor_lines" ] = lines
                       params[ "bgp_routemap_lines" ] = routemap
@@ -527,18 +535,12 @@ def Handle_Notification(obj, state):
                            lines2 += '\n openfabric passive'
                         lines2 += "\n!"
                       params[ "openfabric_interface_lines" ] = lines2
-
-                    ni.update( params )
                 else:
-                    state.network_instances[ net_inst ] = { **params, "interfaces" : {}, "openfabric_interfaces" : {} }
+                    state.network_instances[ net_inst ] = { "bgp_interfaces" : {}, "openfabric_interfaces" : {} }
 
-            params[ "enabled_daemons" ] = " ".join( enabled_daemons )
-            script_update_frr(**params)
-            if interfaces!=[] and params[ "bgp" ] == "enable":
-               MonitoringThread( state, net_inst, interfaces ).start()
-            else:
-               logging.info( "interfaces==[] or FRR BGP disabled, not starting monitor thread yet" )
-            return True
+            if updateParam( "enabled_daemons"," ".join( enabled_daemons ) ):
+                params['frr'] = 'restart' # something other than 'running' or 'stopped'
+            state.network_instances[ net_inst ].update( **params )
 
         # Tends to come first (always?) when full blob is configured
         elif obj.config.key.js_path == ".network_instance.interface":
@@ -561,33 +563,24 @@ def Handle_Notification(obj, state):
 
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             # lookup AS for this ns, check if enabled (i.e. daemon running)
-            if net_inst in state.network_instances:
+            if ni != {}:
                 ni = state.network_instances[ net_inst ]
                 if peer_as is not None:
-                   ni['interfaces'][ intf ] = peer_as
+                   ni['bgp_interfaces'][ intf ] = peer_as
                    cmd = f"neighbor {intf} interface remote-as {peer_as}"
                 else:
-                   ni['interfaces'].pop( intf, None )
+                   ni['bgp_interfaces'].pop( intf, None )
                    cmd = f"no neighbor {intf}"
-                if ni['admin_state']=='enable':
-                   # TODO add 'interface {intf} ipv6 nd suppress-ra'? doesn't work
-                   # TODO support AS changes?
-                   run_vtysh( ns=net_inst,
-                              context=f"router bgp {ni['autonomous_system']}",
-                              config=[cmd] )
 
-                   # Wait a few seconds, then retrieve the peer's router-id and AS
-                   if peer_as is not None:
-                       # XXX Should start 1 thread per network-instance, or even
-                       # 1 thread for all instances. This is polling
-                       MonitoringThread(state,net_inst,[intf]).start()
+                # If FRR daemons are running, update this interface
+                if 'frr' in ni and ni['frr']=='running':
+                   if 'bgp' in ni and ni['bgp']=='enable':
+                      ctxt = f"router bgp {ni['autonomous_system']}"
+                      run_vtysh( ns=net_inst, context=ctxt, config=[cmd] )
 
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
-                  "interfaces" : { intf : peer_as },
-                  "admin_state" : "disable",
-                  "openfabric_interfaces" : {},
-                  "openfabric" : "disable"
+                  "bgp_interfaces" : { intf : peer_as }
                 }
 
         elif obj.config.key.js_path == ".network_instance.interface.openfabric":
@@ -600,29 +593,27 @@ def Handle_Notification(obj, state):
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             if net_inst in state.network_instances:
                 ni = state.network_instances[ net_inst ]
-                if ni['openfabric']=='enable':
-                   name = ni['openfabric_name']
-                   no_ = "" if activate else "no "
-                   cmds = [ f"{no_}ip router openfabric {name}" ]
-                   if intf[0:2] == "lo" and activate:
-                      cmds += "openfabric passive"
-                   run_vtysh( ns=net_inst,context=f"interface {intf}",config=cmds )
-                else:
-                   ni['openfabric_interfaces'][ intf ] = True
+                ni['openfabric_interfaces'][ intf ] = True
 
+                if 'frr' in ni and ni['frr']=='running':
+                  if 'openfabric' in ni and ni['openfabric']=='enable':
+                     name = ni['openfabric_name']
+                     no_ = "" if activate else "no "
+                     cmds = [ f"{no_}ip router openfabric {name}" ]
+                     if intf[0:2] == "lo" and activate:
+                        cmds += "openfabric passive"
+                     run_vtysh( ns=net_inst,context=f"interface {intf}",config=cmds )
             elif activate:
-                state.network_instances[ net_inst ] = {
-                  "openfabric_interfaces" : { intf : True },
-                  "openfabric" : "disable",
-                  "interfaces" : {},
-                  "admin_state" : "disable",
-                }
+                state.network_instances[ net_inst ].update( {
+                    "openfabric_interfaces" : { intf : True },
+                } )
 
+        return net_inst
     else:
         logging.info(f"Unexpected notification : {obj}")
 
-    # dont subscribe to LLDP now
-    return False
+    # No network namespaces modified
+    return None
 
 ###########################
 # Invokes gnmic client to update router configuration, via bash script
@@ -667,6 +658,23 @@ class State(object):
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
 
+def UpdateDaemons( state, modified_netinstances ):
+    for n in modified_netinstances:
+       ni = state.network_instances[ n ]
+
+       # First, (re)start or stop FRR daemons
+       if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
+          script_update_frr( **ni )
+          ni['frr'] = 'running' if ni['admin_state']=='enable' else 'stopped'
+
+       if 'bgp' in ni and ni['bgp']=='enable' and ni['bgp_interfaces']!=[]:
+
+           # TODO run any update commands when interfaces are added/removed
+           # run_vtysh( ns=net_inst,
+           #  context=f"router bgp {ni['autonomous_system']}",
+           #  config=[cmd] )
+           MonitoringThread( state, n, ni['bgp_interfaces'] ).start()
+
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.
 ## Agent registration, notification registration, Subscrition to notifications.
@@ -699,12 +707,16 @@ def Run():
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
             count += 1
+            modified = [] # List of modified network instances
             for obj in r.notification:
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
-                    logging.info('TO DO -commit.end config')
+                    logging.info(f'Processing commit.end, updating daemons...{modified}')
+                    UpdateDaemons( state, modified )
                 else:
-                    Handle_Notification(obj, state)
-                    logging.info(f'Updated state: {state}')
+                    netns = Handle_Notification(obj, state)
+                    logging.info(f'Updated state after {netns}: {state}')
+                    if netns is not None:
+                        modified.append( netns )
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'_Rendezvous error: {err}')

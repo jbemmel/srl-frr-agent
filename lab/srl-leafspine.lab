@@ -7,7 +7,7 @@ topology:
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # Uses custom container image containing FRR agent
       image: srl/frr-demo:latest
-      agents: [ srl-frr-agent.yml ]
+      agents: [ ../srl-frr-agent.yml ]
 
   nodes:
     leaf1:  { kind: srl, group: leaves, startup-config: leaf1-frr.cfg.json }
