@@ -570,16 +570,18 @@ def Handle_Notification(obj, state):
                 ni = state.network_instances[ net_inst ]
                 if peer_as is not None:
                    ni['bgp_interfaces'][ intf ] = peer_as
-                   cmd = f"neighbor {intf} interface remote-as {peer_as}"
+                   cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
+                           f"neighbor {intf} port {ni['frr_bgpd_port']}" ]
+                   # TODO add to route map to drop local routes
                 else:
                    ni['bgp_interfaces'].pop( intf, None )
-                   cmd = f"no neighbor {intf}"
+                   cmd = [ f"no neighbor {intf}" ]
 
                 # If FRR daemons are running, update this interface
                 if 'frr' in ni and ni['frr']=='running':
                    if 'bgp' in ni and ni['bgp']=='enable':
                       ctxt = f"router bgp {ni['autonomous_system']}"
-                      run_vtysh( ns=net_inst, context=ctxt, config=[cmd] )
+                      run_vtysh( ns=net_inst, context=ctxt, config=cmd )
 
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
