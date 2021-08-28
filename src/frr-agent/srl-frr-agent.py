@@ -613,6 +613,7 @@ def Handle_Notification(obj, state):
         logging.info(f"Unexpected notification : {obj}")
 
     # No network namespaces modified
+    logging.info("No network instances modified...")
     return None
 
 ###########################
@@ -703,15 +704,16 @@ def Run():
 
     state = State()
     count = 1
+    modified = [] # List of modified network instances
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
             count += 1
-            modified = [] # List of modified network instances
             for obj in r.notification:
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info(f'Processing commit.end, updating daemons...{modified}')
                     UpdateDaemons( state, modified )
+                    modified = [] # Restart list
                 else:
                     netns = Handle_Notification(obj, state)
                     logging.info(f'Updated state after {netns}: {state}')
