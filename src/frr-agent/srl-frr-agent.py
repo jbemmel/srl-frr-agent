@@ -267,13 +267,15 @@ def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local,ipv6_nexthop):
     logging.info(f"NextHopGroupAddOrUpdate :: {nhg_response.status} {nhg_response.error_str}")
     return nhg_response.status != 0
 
-def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6):
+def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6,preference):
     route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
     route_request = route_service_pb2.RouteAddRequest()
     route_info = route_request.routes.add()
+    route_info.data.preference = preference
+
     # Could configure defaults for these in the agent Yang params
-    # route_info.data.preference = ip['preference']
     # route_info.data.metric = ip['metric']
+
     route_info.key.net_inst_name = network_instance
     ip = ipaddress.ip_address(ip_addr)
     route_info.key.ip_prefix.ip_addr.addr = ip.packed
@@ -300,7 +302,7 @@ def SDK_DelRoute(network_instance,ip_addr,prefix_len):
     logging.info(f"RouteDeleteRequest RESPONSE:: {route_response.status} {route_response.error_str}")
     return route_response.status != 0
 
-def Add_Route(network_instance, netlink_msg):
+def Add_Route(network_instance, netlink_msg, peer_2_pref):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
     # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
@@ -309,8 +311,9 @@ def Add_Route(network_instance, netlink_msg):
        via_v6 = att4[1]['addr'] # RTA_VIA, ipv4
     else:
        via_v6 = att4[1] # RTA_GATEWAY, ipv6
-    logging.info( f"Add_Route {prefix}/{length}" )
-    return SDK_AddRoute(network_instance,prefix,length,via_v6)
+    preference = peer_2_pref[ via_v6 ]
+    logging.info( f"Add_Route {prefix}/{length} pref={preference}" )
+    return SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
 
 def Del_Route(network_instance, netlink_msg):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
@@ -323,8 +326,9 @@ def Del_Route(network_instance, netlink_msg):
 #
 from threading import Thread
 class MonitoringThread(Thread):
-   def __init__(self, net_inst, interfaces):
+   def __init__(self, state, net_inst, interfaces):
        Thread.__init__(self)
+       self.state = state
        self.net_inst = net_inst
        self.interfaces = interfaces
 
@@ -360,6 +364,11 @@ class MonitoringThread(Thread):
       except Exception as ex:
          logging.error( f"Exception while starting IPDB callback: {ex}" )
 
+      # Map of peer ipv6 link_local -> route preference (ibgp or ebgp)
+      peer_2_pref = {}
+      params = self.state.network_instances[ self.net_inst ]
+      ibgp_pref = int( params[ 'ibgp_preference' ] )
+      ebgp_pref = int( params[ 'ebgp_preference' ] )
       try:
         todo = self.interfaces
         while todo != []:
@@ -382,6 +391,7 @@ class MonitoringThread(Thread):
                       peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       SDK_AddNHG( self.net_inst, peerId, neighbor, peer_v6 )
+                      peer_2_pref[ neighbor ] = ibgp_pref if i['localAs'] == i['remoteAs'] else ebgp_pref
                       todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={todo}" )
 
@@ -398,7 +408,7 @@ class MonitoringThread(Thread):
             action, msg = work_queue.get()
             logging.info( f"MonitoringThread {self.net_inst} got event: {action}" )
             if action == "RTM_NEWROUTE":
-               Add_Route( self.net_inst, msg )
+               Add_Route( self.net_inst, msg, peer_2_pref )
             elif action == "RTM_DELROUTE":
                Del_Route( self.net_inst, msg )
             work_queue.task_done()
@@ -452,6 +462,12 @@ def Handle_Notification(obj, state):
                       if params[ "bgp" ] == "enable":
                         enabled_daemons.append( "bgpd" )
                     params[ "frr_bgpd_port" ] = bgp['port']['value'] if 'port' in bgp else "1179"
+                    if 'preference' in bgp:
+                      # Keep these as strings, to pass to script
+                      params[ "ebgp_preference" ] = bgp['preference']['ebgp']['value']
+                      params[ "ibgp_preference" ] = bgp['preference']['ibgp']['value']
+                    else:
+                      params[ "ebgp_preference" ] = params[ "ibgp_preference" ] = "170"
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
                     if 'admin_state' in eigrp:
@@ -483,13 +499,23 @@ def Handle_Notification(obj, state):
                     ni = state.network_instances[ net_inst ]
                     if "bgpd" in enabled_daemons:
                       lines = ""
+                      routemap = ""
+                      entry = 10
                       for name,peer_as in ni['interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         # Use configured BGP port, custom patch
                         lines += f'neighbor {name} port {params[ "frr_bgpd_port" ]}\n '
+
+                        # Add a route-map entry to drop local routes on this interface
+                        routemap += f'route-map drop_interface_routes deny {entry}\n'
+                        routemap += f' match interface {name}\n'
+                        entry += 10
+
                         interfaces.append( name )
-                      params[ "bgp_neighbor_lines"] = lines
+                      routemap += f'route-map drop_interface_routes permit {entry}'
+                      params[ "bgp_neighbor_lines" ] = lines
+                      params[ "bgp_routemap_lines" ] = routemap
 
                     if 'openfabric_name' in params:
                       _of = params['openfabric_name' ]
@@ -509,7 +535,7 @@ def Handle_Notification(obj, state):
             params[ "enabled_daemons" ] = " ".join( enabled_daemons )
             script_update_frr(**params)
             if interfaces!=[] and params[ "bgp" ] == "enable":
-               MonitoringThread( net_inst, interfaces ).start()
+               MonitoringThread( state, net_inst, interfaces ).start()
             else:
                logging.info( "interfaces==[] or FRR BGP disabled, not starting monitor thread yet" )
             return True
@@ -554,7 +580,7 @@ def Handle_Notification(obj, state):
                    if peer_as is not None:
                        # XXX Should start 1 thread per network-instance, or even
                        # 1 thread for all instances. This is polling
-                       MonitoringThread(net_inst,[intf]).start()
+                       MonitoringThread(state,net_inst,[intf]).start()
 
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {

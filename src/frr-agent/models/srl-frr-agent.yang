@@ -73,6 +73,28 @@ module srl-frr-agent {
                    error-message "If Nokia BGP is configured, FRR BGP cannot use TCP port 179 in the same network-instance";
                 }
               }
+
+              container preference {
+                description
+                    "Options for controlling the route table preference of BGP routes";
+                leaf ebgp {
+                    type uint8;
+                    default 170;
+                    description
+                        "The default route table preference for all EBGP learned routes
+
+                        BGP import policies can override this preference value on a route by route basis.";
+                }
+                leaf ibgp {
+                    type uint8;
+                    default 170;
+                    description
+                        "The default route table preference for all IBGP learned routes
+
+                        BGP import policies can override this preference value on a route by route basis.";
+                }
+            }
+
             }
             container eigrp {
               presence "Configure EIGRP";

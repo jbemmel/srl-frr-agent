@@ -112,13 +112,15 @@ router bgp $autonomous_system
 
  !
  address-family ipv4 unicast
-  redistribute connected
+  redistribute connected route-map drop_interface_routes
  exit-address-family
  !
  address-family ipv6 unicast
-  redistribute connected
+  redistribute connected route-map drop_interface_routes
  exit-address-family
  !
+${bgp_routemap_lines}
+!
 EOF
 else
 BGP_CONFIG="no router bgp $autonomous_system"
