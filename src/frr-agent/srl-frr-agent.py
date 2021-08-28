@@ -303,11 +303,19 @@ def SDK_DelRoute(network_instance,ip_addr,prefix_len):
     return route_response.status != 0
 
 def Add_Route(network_instance, netlink_msg, peer_2_pref):
+    logging.info( f"Add_Route {network_instance} peer_2_pref={peer_2_pref}" )
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
     # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
     att4 = netlink_msg['attrs'][4]
-    if att4[0] == "RTA_VIA":
+    if att4[0] == "RTA_MULTIPATH":
+        for v in att4[0][1]:
+           via_v6 = v['attrs'][0][1]['addr']
+           preference = peer_2_pref[ via_v6 ]
+           logging.info( f"multipath{via_v6} Add_Route {prefix}/{length} pref={preference}" )
+           SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
+        return
+    elif att4[0] == "RTA_VIA":
        via_v6 = att4[1]['addr'] # RTA_VIA, ipv4
     else:
        via_v6 = att4[1] # RTA_GATEWAY, ipv6
