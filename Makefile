@@ -10,10 +10,16 @@ ifndef SR_LINUX_RELEASE
 override SR_LINUX_RELEASE="latest"
 endif
 
-build:
+.PHONY: build build-combined do-build frr build-srlinux
+
+build: BASEIMG=srl/custombase
+build: do-build
+
+do-build:
 	sudo DOCKER_BUILDKIT=1 docker build --build-arg SRL_UNNUMBERED_RELEASE=${TAG} \
 	                  --build-arg http_proxy=${HTTP_PROXY} \
 										--build-arg https_proxy=${HTTP_PROXY} \
+										--build-arg SR_BASEIMG="${BASEIMG}" \
 	                  --build-arg SR_LINUX_RELEASE="${SR_LINUX_RELEASE}" \
 	                  -f ./Dockerfile -t ${IMG} .
 	sudo docker tag ${IMG} ${LATEST}
@@ -25,3 +31,10 @@ frr:
 	git clone --branch stable/8.0 https://github.com/exergy-connect/frr.git && \
 	cd frr && \
 	sudo DOCKER_BUILDKIT=1 docker/centos-8/build.sh
+
+build-srlinux: BASEIMG=ghcr.io/nokia/srlinux
+build-srlinux: do-build
+
+build-combined: BASEIMG=srl/auto-config
+build-combined:	NAME=srl/frr-auto-config
+build-combined: do-build

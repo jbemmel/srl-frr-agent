@@ -1,5 +1,8 @@
+ARG SR_BASEIMG
 ARG SR_LINUX_RELEASE
-FROM srl/custombase:$SR_LINUX_RELEASE AS target
+
+# FROM srl/custombase:$SR_LINUX_RELEASE AS target
+FROM $SR_BASEIMG:$SR_LINUX_RELEASE AS target
 
 RUN sudo yum install -y python3-pyroute2
 
