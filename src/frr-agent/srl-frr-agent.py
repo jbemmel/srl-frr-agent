@@ -338,7 +338,7 @@ class MonitoringThread(Thread):
        Thread.__init__(self)
        self.state = state
        self.net_inst = net_inst
-       self.interfaces = interfaces
+       self.interfaces = interfaces # dict of intf->as
 
        # Check that gNMI is connected now
        grpc.channel_ready_future(gnmi_channel).result(timeout=5)
@@ -378,7 +378,7 @@ class MonitoringThread(Thread):
       ibgp_pref = int( params[ 'ibgp_preference' ] )
       ebgp_pref = int( params[ 'ebgp_preference' ] )
       try:
-        todo = self.interfaces
+        todo = list( self.interfaces.keys() )
         while todo != []:
           for _i in todo:
             _get_peer = f'show bgp neighbors {_i} json'
@@ -683,7 +683,7 @@ def UpdateDaemons( state, modified_netinstances ):
           script_update_frr( **params )
           ni['frr'] = 'running' if ni['admin_state']=='enable' else 'stopped'
 
-       if 'bgp' in ni and ni['bgp']=='enable' and ni['bgp_interfaces']!=[]:
+       if 'bgp' in ni and ni['bgp']=='enable' and ni['bgp_interfaces']!={}:
 
            # TODO run any update commands when interfaces are added/removed
            # run_vtysh( ns=net_inst,
