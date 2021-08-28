@@ -1,7 +1,7 @@
 {
   "auto_config_agent:auto-config-agent": {
     "role": "leaf",
-    "use-ospfv3": true,
+    "use-bgp-unnumbered": true,
     "use-evpn": true
   },
   "srl_nokia-acl:acl": {
@@ -317,6 +317,22 @@
             }
           },
           {
+            "sequence-id": 195,
+            "description": "Accept incoming FRR BGP when the other router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": "tcp",
+              "destination-port": {
+                "operator": "eq",
+                "value": 1179
+              }
+            }
+          },
+          {
             "sequence-id": 200,
             "description": "Accept incoming BGP when this router initiates the TCP connection",
             "action": {
@@ -329,6 +345,22 @@
               "source-port": {
                 "operator": "eq",
                 "value": 179
+              }
+            }
+          },
+          {
+            "sequence-id": 205,
+            "description": "Accept incoming FRR BGP when this router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": "tcp",
+              "source-port": {
+                "operator": "eq",
+                "value": 1179
               }
             }
           },
@@ -869,6 +901,22 @@
             }
           },
           {
+            "sequence-id": 225,
+            "description": "Accept incoming FRR BGP when the other router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "next-header": "tcp",
+              "destination-port": {
+                "operator": "eq",
+                "value": 1179
+              }
+            }
+          },
+          {
             "sequence-id": 230,
             "description": "Accept incoming BGP when this router initiates the TCP connection",
             "action": {
@@ -881,6 +929,22 @@
               "source-port": {
                 "operator": "eq",
                 "value": 179
+              }
+            }
+          },
+          {
+            "sequence-id": 235,
+            "description": "Accept incoming FRR BGP when this router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "next-header": "tcp",
+              "source-port": {
+                "operator": "eq",
+                "value": 1179
               }
             }
           },
