@@ -665,7 +665,8 @@ def UpdateDaemons( state, modified_netinstances ):
 
        # First, (re)start or stop FRR daemons
        if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
-          script_update_frr( **ni )
+          params = { **ni, "bgp_interfaces" : "" } # Override dict
+          script_update_frr( **params )
           ni['frr'] = 'running' if ni['admin_state']=='enable' else 'stopped'
 
        if 'bgp' in ni and ni['bgp']=='enable' and ni['bgp_interfaces']!=[]:
