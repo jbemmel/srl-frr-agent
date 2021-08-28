@@ -34,6 +34,9 @@ build-srlinux: BASEIMG=ghcr.io/nokia/srlinux
 build-srlinux: NAME=srl/frr-demo
 build-srlinux: do-build
 
+#
+# This works but is more cumbersome, it rebuilds image every time base changes
+#
 build-auto-frr: BASEIMG=srl/auto-config
 build-auto-frr:	NAME=srl/auto-frr-demo
 build-auto-frr: do-build
