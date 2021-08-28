@@ -719,7 +719,7 @@ def Run():
 
     state = State()
     count = 1
-    modified = [] # List of modified network instances
+    modified = {} # Dict of modified network instances, no duplicates
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
@@ -728,12 +728,12 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info(f'Processing commit.end, updating daemons...{modified}')
                     UpdateDaemons( state, modified )
-                    modified = [] # Restart list
+                    modified = {} # Restart dict
                 else:
                     netns = Handle_Notification(obj, state)
                     logging.info(f'Updated state after {netns}: {state}')
                     if netns in state.network_instances: # filter mgmt and other irrelevant ones
-                        modified.append( netns )
+                        modified[ netns ] = True
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'_Rendezvous error: {err}')
