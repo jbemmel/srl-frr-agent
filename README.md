@@ -182,7 +182,7 @@ C>* 169.254.1.0/24 is directly connected, gateway, 00:05:57
 
 On SR Linux side, the routes get instantiated:
 ```
-A:spine1# show network-instance default route-table all                                                                                                                                                            
+A:leaf1# show network-instance default route-table all                                                                                                                                                             
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 IPv4 Unicast route table of network instance default
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -190,15 +190,14 @@ IPv4 Unicast route table of network instance default
 |               Prefix                |  ID   | Route Type |     Route Owner      |      Best/Fib-       |  Metric  |  Pref   |    Next-hop (Type)    |  Next-hop Interface   |
 |                                     |       |            |                      |     status(slot)     |          |         |                       |                       |
 +=====================================+=======+============+======================+======================+==========+=========+=======================+=======================+
-| 1.1.0.0/31                          | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 100     | 1.1.1.1 (indirect)    | None                  |
-| 1.1.1.0/31                          | 1     | local      | net_inst_mgr         | True/success         | 0        | 0       | 1.1.1.0 (direct)      | ethernet-1/1.0        |
-| 1.1.1.0/32                          | 1     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
-| 100.1.0.1/32                        | 2     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
-| 100.1.1.1/32                        | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 100     | 1.1.1.1 (indirect)    | None                  |
+| 1.1.0.0/31                          | 1     | local      | net_inst_mgr         | True/success         | 0        | 0       | 1.1.0.0 (direct)      | ethernet-1/1.0        |
+| 1.1.0.0/32                          | 1     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
+| 100.1.0.1/32                        | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 170     | 1.1.0.1 (indirect)    | None                  |
+| 100.1.1.1/32                        | 2     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
 +-------------------------------------+-------+------------+----------------------+----------------------+----------+---------+-----------------------+-----------------------+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-5 IPv4 routes total
-5 IPv4 prefixes with active routes
+4 IPv4 routes total
+4 IPv4 prefixes with active routes
 0 IPv4 prefixes with active ECMP routes
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -208,12 +207,12 @@ IPv6 Unicast route table of network instance default
 |               Prefix                |  ID   | Route Type |     Route Owner      |      Best/Fib-       |  Metric  |  Pref   |    Next-hop (Type)    |  Next-hop Interface   |
 |                                     |       |            |                      |     status(slot)     |          |         |                       |                       |
 +=====================================+=======+============+======================+======================+==========+=========+=======================+=======================+
-| ::ffff:1.1.0.0/127                  | 1     | local      | net_inst_mgr         | True/success         | 0        | 0       | ::ffff:1.1.0.1        | ethernet-1/1.0        |
+| ::ffff:1.1.0.0/127                  | 1     | local      | net_inst_mgr         | True/success         | 0        | 0       | ::ffff:1.1.0.0        | ethernet-1/1.0        |
 |                                     |       |            |                      |                      |          |         | (direct)              |                       |
-| ::ffff:1.1.0.1/128                  | 1     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
-| 2001::6401:1/128                    | 2     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
-| 2001::6401:101/128                  | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 100     | ::ffff:1.1.0.0        | None                  |
+| ::ffff:1.1.0.0/128                  | 1     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
+| 2001::6401:1/128                    | 10    | ndk1       | srl_frr_agent        | True/success         | 0        | 170     | ::ffff:1.1.0.1        | None                  |
 |                                     |       |            |                      |                      |          |         | (indirect)            |                       |
+| 2001::6401:101/128                  | 2     | host       | net_inst_mgr         | True/success         | 0        | 0       | None (extract)        | None                  |
 +-------------------------------------+-------+------------+----------------------+----------------------+----------+---------+-----------------------+-----------------------+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 4 IPv6 routes total
@@ -221,9 +220,9 @@ IPv6 Unicast route table of network instance default
 0 IPv6 prefixes with active ECMP routes
 ```
 
-Routes from BGP unnumbered peers are distinguished as coming from the "srl_frr_agent", via the NDK. Note that the internal 1.1.0.0/31 route could be suppressed (as would happen if a link local 169.254.x.y address were used instead)
+Routes from BGP unnumbered peers are distinguished as coming from the "srl_frr_agent", via the NDK. Local interface routes like 1.1.0.0/31 are filtered out by a route-map in FRR (as would happen if a link local 169.254.x.y address were used instead)
 
-Preference and metric values could be configured if required. Multiple BGP unnumbered interfaces (to different peers) can be supported per network instance
+Preference values are configurable for IBGP or EBGP, both default 170. Multiple BGP unnumbered interfaces (to different peers) can be supported per network instance
 
 ## Enhanced Interior Gateway Routing Protocol (EIGRP) - RFC7868 (same AS)
 Spine + Leaf:
