@@ -546,8 +546,8 @@ def Handle_Notification(obj, state):
             state.network_instances[ net_inst ].update( **params )
 
         # Tends to come first (always?) when full blob is configured
-    elif (obj.config.key.js_path == ".network_instance.interface" and
-         obj.config.op != 2): # Skip deletes, TODO process them?
+        elif (obj.config.key.js_path == ".network_instance.interface"
+          and obj.config.op != 2): # Skip deletes, TODO process them?
             json_acceptable_string = obj.config.data.json.replace("'", "\"")
             data = json.loads(json_acceptable_string)
 
