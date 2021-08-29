@@ -318,7 +318,7 @@ def SDK_DelRoute(network_instance,ip_addr,prefix_len):
     return route_response.status != 0
 
 def Add_Route(network_instance, netlink_msg, preference):
-    logging.info( f"Add_Route {network_instance} pref={preference} m={netlink_msg}" )
+    # logging.info( f"Add_Route {network_instance} pref={preference} m={netlink_msg}" )
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
     # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
@@ -337,12 +337,12 @@ def Add_Route(network_instance, netlink_msg, preference):
       for v in att4[0][1]:
          via_v6 = get_ipv6_nh( v['attrs'][0] )
          oif = v['oif']
-         logging.info( f"multipath{via_v6} Add_Route {prefix}/{length} oif={oif}" )
+         logging.info( f"multipath[{via_v6},{oif}] Add_Route {prefix}/{length}" )
          SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
     else:
       via_v6 = get_ipv6_nh( att4 )
       oif = netlink_msg['attrs'][5][1] # RTA_OIF
-      logging.info( f"Add_Route {prefix}/{length} oif={oif}" )
+      logging.info( f"Add_Route {prefix}/{length} via_v6={via_v6} oif={oif}" )
       SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
 
 def Del_Route(network_instance, netlink_msg):
