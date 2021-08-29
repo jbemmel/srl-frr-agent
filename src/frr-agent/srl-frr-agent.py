@@ -142,12 +142,17 @@ def ipv6_2_mac(ipv6):
 
     return ":".join(macParts)
 
-def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, gnmi_stub ):
+def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stub ):
    logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
-   subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
-   ips = list( map( str, subnet.hosts() ) )
+
+   # Tried using /31 around router ID, but interferes with loopback peering
+   # subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
+   # ips = list( map( str, subnet.hosts() ) )
+   peerlinks = list(ipaddress.ip_network(link_local_range).subnets(new_prefix=31))
+   peer_link = peerlinks[ int(phys_sub[0].split('-')[1]) ]
+   ips = list( map( str, peer_link.hosts() ) )
 
    # For IPv6, build a /127 based on mapped ipv4 of lowest ID
    lowest_id = min(local_ip,peer_ip)
@@ -160,20 +165,22 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, gnmi_stub ):
    logging.info( f"ConfigurePeerIPMAC v6={v6_ips} local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
+   desc = f"auto-configured by SRL FRR agent peer={peer_ip}"
    config = {
      "admin-state" : "enable",
+     "description" : desc,
      "ipv4" : {
         "address" : [
-           { "ip-prefix" : ips[ 0 if peer_ip == ips[1] else 1 ] + "/31",
+           { "ip-prefix" : ips[ 0 ] + "/31",
              "primary": '[null]'  # type 'empty'
            }
         ],
         "arp" : {
            "neighbor": [
              {
-               "ipv4-address": peer_ip,
+               "ipv4-address": ips[ 1 ],
                "link-layer-address": mac,
-               "_annotate_link-layer-address": "managed by SRL FRR agent"
+               "_annotate_link-layer-address": desc
              }
            ]
         }
@@ -396,7 +403,7 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, gnmi_stub )
+                      peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       SDK_AddNHG( self.net_inst, peerId, neighbor, peer_v6 )
                       peer_2_pref[ neighbor ] = ibgp_pref if i['localAs'] == i['remoteAs'] else ebgp_pref
@@ -484,6 +491,7 @@ def Handle_Notification(obj, state):
                       if params[ "bgp" ] == "enable":
                         enabled_daemons.append( "bgpd" )
                     params[ "frr_bgpd_port" ] = bgp['port']['value'] if 'port' in bgp else "1179"
+                    params[ "bgp_link_local_range" ] = bgp['link_local_range']['value']
                     if 'preference' in bgp:
                       # Keep these as strings, to pass to script
                       params[ "ebgp_preference" ] = bgp['preference']['ebgp']['value']
@@ -519,22 +527,13 @@ def Handle_Notification(obj, state):
                 if ni != {}:
                     if "bgpd" in enabled_daemons:
                       lines = ""
-                      routemap = ""
-                      entry = 10
                       for name,peer_as in ni['bgp_interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         # Use configured BGP port, custom patch
                         lines += f'neighbor {name} port {params[ "frr_bgpd_port" ]}\n '
 
-                        # Add a route-map entry to drop local routes on this interface
-                        routemap += f'route-map drop_interface_routes deny {entry}\n'
-                        routemap += f' match interface {name}\n'
-                        entry += 10
-
-                      routemap += f'route-map drop_interface_routes permit {entry}'
                       params[ "bgp_neighbor_lines" ] = lines
-                      params[ "bgp_routemap_lines" ] = routemap
 
                     if 'openfabric_name' in params:
                       _of = params['openfabric_name' ]

@@ -119,7 +119,12 @@ router bgp $autonomous_system
   redistribute connected route-map drop_interface_routes
  exit-address-family
  !
-${bgp_routemap_lines}
+ip prefix-list link-local seq 5 deny ${bgp_link_local_range} ge 31
+!
+route-map drop_interface_routes deny 10
+ match ip address prefix-list link-local
+!
+route-map drop_interface_routes permit 20
 !
 EOF
 else

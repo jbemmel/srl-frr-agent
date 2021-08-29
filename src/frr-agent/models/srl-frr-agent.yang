@@ -93,8 +93,13 @@ module srl-frr-agent {
 
                         BGP import policies can override this preference value on a route by route basis.";
                 }
-            }
+              }
 
+              leaf link-local-range {
+                description "IP prefix range to use for link local ipv4 /31 next hop pairs, default 192.0.0.0/24";
+                type string;
+                default "192.0.0.0/24";
+              }
             }
             container eigrp {
               presence "Configure EIGRP";
