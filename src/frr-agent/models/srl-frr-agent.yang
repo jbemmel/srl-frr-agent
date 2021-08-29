@@ -74,25 +74,12 @@ module srl-frr-agent {
                 }
               }
 
-              container preference {
-                description
-                    "Options for controlling the route table preference of BGP routes";
-                leaf ebgp {
-                    type uint8;
-                    default 170;
-                    description
-                        "The default route table preference for all EBGP learned routes
+              leaf preference {
+                description "The default route table preference for all FRR BGP learned routes
+                    BGP import policies can override this preference value on a route by route basis.";
 
-                        BGP import policies can override this preference value on a route by route basis.";
-                }
-                leaf ibgp {
-                    type uint8;
-                    default 170;
-                    description
-                        "The default route table preference for all IBGP learned routes
-
-                        BGP import policies can override this preference value on a route by route basis.";
-                }
+                type uint8;
+                default 170;
               }
 
               leaf link-local-range {

@@ -51,9 +51,6 @@ from logging.handlers import RotatingFileHandler
 ############################################################
 agent_name='srl_frr_agent'
 
-# Global IPDB
-ipdb = None
-
 ############################################################
 ## Open a GRPC channel to connect to sdk_mgr on the dut
 ## sdk_mgr will be listening on 50053
@@ -142,6 +139,14 @@ def ipv6_2_mac(ipv6):
 
     return ":".join(macParts)
 
+#
+# Calculate pair of /31 IPs for given interface (e.g. e1-1 => peerlinks[0])
+#
+def GetLinkLocalIPs( phys_intf, link_local_range ):
+   peerlinks = list(ipaddress.ip_network(link_local_range).subnets(new_prefix=31))
+   peer_link = peerlinks[ int(phys_intf.split('-')[1]) - 1 ]
+   return list( map( str, peer_link.hosts() ) )
+
 def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stub ):
    logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
@@ -150,9 +155,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # Tried using /31 around router ID, but interferes with loopback peering
    # subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
    # ips = list( map( str, subnet.hosts() ) )
-   peerlinks = list(ipaddress.ip_network(link_local_range).subnets(new_prefix=31))
-   peer_link = peerlinks[ int(phys_sub[0].split('-')[1]) - 1 ]
-   ips = list( map( str, peer_link.hosts() ) )
+   ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
    # For IPv6, build a /127 based on mapped ipv4 of lowest ID
    lowest_id = min(local_ip,peer_ip)
@@ -195,7 +198,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
      }
    }
    gNMI_Set( gnmi_stub, path, config )
-   return peer_v6
+   return ( ips[1], peer_v6 )
 
 # Works, but no longer used
 def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
@@ -287,6 +290,11 @@ def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6,preference):
     ip = ipaddress.ip_address(ip_addr)
     route_info.key.ip_prefix.ip_addr.addr = ip.packed
     route_info.key.ip_prefix.prefix_length = int(prefix_len)
+
+    #
+    # TODO check what happens if NHG does not exist yet?
+    # Use oif in name of NHG instead? does not change, unlike ipv6 next hop
+    #
     route_info.data.nexthop_group_name = via_v6 + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
 
     logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
@@ -309,8 +317,8 @@ def SDK_DelRoute(network_instance,ip_addr,prefix_len):
     logging.info(f"RouteDeleteRequest RESPONSE:: {route_response.status} {route_response.error_str}")
     return route_response.status != 0
 
-def Add_Route(network_instance, netlink_msg, peer_2_pref):
-    logging.info( f"Add_Route {network_instance} peer_2_pref={peer_2_pref} m={netlink_msg}" )
+def Add_Route(network_instance, netlink_msg, preference):
+    logging.info( f"Add_Route {network_instance} pref={preference} m={netlink_msg}" )
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
     # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
@@ -328,13 +336,13 @@ def Add_Route(network_instance, netlink_msg, peer_2_pref):
     if att4[0] == "RTA_MULTIPATH":
       for v in att4[0][1]:
          via_v6 = get_ipv6_nh( v['attrs'][0] )
-         preference = peer_2_pref[ via_v6 ]
-         logging.info( f"multipath{via_v6} Add_Route {prefix}/{length} pref={preference}" )
+         oif = v['oif']
+         logging.info( f"multipath{via_v6} Add_Route {prefix}/{length} oif={oif}" )
          SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
     else:
       via_v6 = get_ipv6_nh( att4 )
-      preference = peer_2_pref[ via_v6 ]
-      logging.info( f"Add_Route {prefix}/{length} pref={preference}" )
+      oif = netlink_msg['attrs'][5][1] # RTA_OIF
+      logging.info( f"Add_Route {prefix}/{length} oif={oif}" )
       SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
 
 def Del_Route(network_instance, netlink_msg):
@@ -342,6 +350,31 @@ def Del_Route(network_instance, netlink_msg):
     length = netlink_msg['dst_len']
     logging.info( f"Del_Route {prefix}/{length}" )
     return SDK_DelRoute(network_instance,prefix,length)
+
+#
+# Registers an IPDB callback handler for route events in the given VRF instance
+#
+def RegisterRouteHandler(net_inst,preference):
+  ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
+
+  # Need interface index to resolve nexthop routes?
+  # logging.info( f"IPDB interfaces:{ipdb.interfaces}" )
+
+  # Register our callback to the IPDB
+  def netlink_callback(ipdb, msg, action):
+      # logging.info(f"IPDB callback msg={msg} action={action}")
+      if action=="RTM_NEWROUTE" and msg['proto'] == 186: # BGP route
+         logging.info( f"Routehandler {net_inst}: Add_Route {msg}" )
+         Add_Route( net_inst, msg, preference )
+      elif action=="RTM_DELROUTE" and msg['proto'] == 186: # BGP route
+         logging.info( f"Routehandler {net_inst}: Del_Route {msg}" )
+         Del_Route( net_inst, msg )
+      else:
+         logging.info( f"netlink_callback: Ignoring {action}" )
+
+  ipdb.register_callback(netlink_callback)
+  return ipdb
+
 
 #
 # Runs as a separate thread
@@ -364,37 +397,7 @@ class MonitoringThread(Thread):
 
       logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
 
-      # Need to register callback before connecting FRR, but postpone processing
-      # of route add/del events by queuing them
-      work_queue = queue.Queue()
-      try:
-         global ipdb
-         ipdb = IPDB(nl=NetNS(f'srbase-{self.net_inst}'))
-
-         # Need interface index to resolve nexthop routes
-         logging.info( f"IPDB interfaces:{ipdb.interfaces}" )
-
-         # Register our callback to the IPDB
-         def netlink_callback(ipdb, msg, action):
-             logging.info(f"IPDB callback msg={msg} action={action}")
-             if action=="RTM_NEWROUTE" and msg['proto'] == 186: # BGP route
-                logging.info( "Queue: Add_Route" )
-                work_queue.put( (action,msg) ) # Could enqueue method ptr here
-             elif action=="RTM_DELROUTE" and msg['proto'] == 186: # BGP route
-                logging.info( "Queue: Del_Route" )
-                work_queue.put( (action,msg) )
-             else:
-                logging.info( f"Ignoring: {action}" )
-
-         ipdb.register_callback(netlink_callback)
-      except Exception as ex:
-         logging.error( f"Exception while starting IPDB callback: {ex}" )
-
-      # Map of peer ipv6 link_local -> route preference (ibgp or ebgp)
-      peer_2_pref = {}
       params = self.state.network_instances[ self.net_inst ]
-      ibgp_pref = int( params[ 'ibgp_preference' ] )
-      ebgp_pref = int( params[ 'ebgp_preference' ] )
       try:
         todo = list( self.interfaces.keys() )
         while todo != []:
@@ -414,10 +417,9 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['bgp_link_local_range'], gnmi_stub )
+                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
-                      SDK_AddNHG( self.net_inst, peerId, neighbor, peer_v6 )
-                      peer_2_pref[ neighbor ] = ibgp_pref if i['localAs'] == i['remoteAs'] else ebgp_pref
+                      SDK_AddNHG( self.net_inst, peer_v4, neighbor, peer_v6 )
                       todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={todo}" )
 
@@ -425,22 +427,6 @@ class MonitoringThread(Thread):
           logging.info( f"MonitoringThread wakes up left={todo}" )
       except Exception as e:
          logging.error(e)
-
-      # After setting up the BGP peering, process route events
-      logging.info( f"MonitoringThread {self.net_inst} starts processing events...queue={work_queue.qsize()}" )
-      # self.daemon = True
-      while True:
-         try:
-            action, msg = work_queue.get()
-            logging.info( f"MonitoringThread {self.net_inst} got event: {action}" )
-            if action == "RTM_NEWROUTE":
-               Add_Route( self.net_inst, msg, peer_2_pref )
-            elif action == "RTM_DELROUTE":
-               Del_Route( self.net_inst, msg )
-            work_queue.task_done()
-         except Exception as ex:
-           traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
-           logging.error( f"Exception while processing {action}: {ex} {traceback_str}" )
 
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
@@ -501,14 +487,11 @@ def Handle_Notification(obj, state):
                       params[ "bgp" ] = bgp['admin_state'][12:]
                       if params[ "bgp" ] == "enable":
                         enabled_daemons.append( "bgpd" )
+
                     params[ "frr_bgpd_port" ] = bgp['port']['value'] if 'port' in bgp else "1179"
                     params[ "bgp_link_local_range" ] = bgp['link_local_range']['value']
-                    if 'preference' in bgp:
-                      # Keep these as strings, to pass to script
-                      params[ "ebgp_preference" ] = bgp['preference']['ebgp']['value']
-                      params[ "ibgp_preference" ] = bgp['preference']['ibgp']['value']
-                    else:
-                      params[ "ebgp_preference" ] = params[ "ibgp_preference" ] = "170"
+                    params[ "bgp_preference" ] = bgp['preference']['value']
+
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
                     if 'admin_state' in eigrp:
@@ -678,6 +661,7 @@ class State(object):
     def __init__(self):
         self.admin_state = None       # May not be set in config
         self.network_instances = {}   # Indexed by name
+        self.ipdbs = {}               # Indexed by name
         # TODO more properties
 
     def __str__(self):
@@ -695,10 +679,10 @@ def UpdateDaemons( state, modified_netinstances ):
 
        if 'bgp' in ni and ni['bgp']=='enable' and ni['bgp_interfaces']!={}:
 
-           # TODO run any update commands when interfaces are added/removed
-           # run_vtysh( ns=net_inst,
-           #  context=f"router bgp {ni['autonomous_system']}",
-           #  config=[cmd] )
+           if n not in state.ipdbs:
+              state.ipdbs[n] = RegisterRouteHandler(n, int(ni['bgp_preference']) )
+
+           # TODO shouldn't run monitoringthread more than once per interface
            MonitoringThread( state, n, ni['bgp_interfaces'] ).start()
 
 ##################################################################################################
@@ -752,7 +736,8 @@ def Run():
         logging.error(f'Exception caught :: {e}')
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
-
+    for n in state.ipdbs:
+       state.ipdbs[n].release()
     Exit_Gracefully(0,0)
 
 ############################################################
@@ -761,10 +746,6 @@ def Run():
 ############################################################
 def Exit_Gracefully(signum, frame):
     logging.info("Caught signal :: {}\n will unregister frr_agent".format(signum))
-    global ipdb
-    if ipdb is not None:
-        ipdb.release()
-        ipdb = None
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
         logging.error('try: Unregister response:: {}'.format(response))
