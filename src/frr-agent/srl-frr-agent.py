@@ -247,37 +247,40 @@ def gNMI_Set( gnmi_stub, path, data ):
              return res
          raise err
 
-def SDK_AddNHG(network_instance,ip_nexthop,ipv6_link_local,ipv6_nexthop):
+def SDK_AddNHG( network_instance, if_index, ip_nexthop=None, ipv6_nexthop=None):
     nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
     nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
 
     # IPv4
     nhg_info = nh_request.group_info.add()
     nhg_info.key.network_instance_name = network_instance
-    nhg_info.key.name = ipv6_link_local + '_v4_frr_sdk' # Must end with '_sdk'
-    nh = nhg_info.data.next_hop.add()
-    nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT? LOCAL?
-    nh.type = nexthop_group_service_pb2.NextHop.REGULAR
-    nh.ip_nexthop.addr = ipaddress.ip_address(ip_nexthop).packed
+    nhg_info.key.name = str(if_index) + '_v4_frr_sdk' # Must end with '_sdk'
+
+    if ip_nexthop is not None:
+      nh = nhg_info.data.next_hop.add()
+      nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT? LOCAL?
+      nh.type = nexthop_group_service_pb2.NextHop.REGULAR
+      nh.ip_nexthop.addr = ipaddress.ip_address(ip_nexthop).packed
 
     # IPv6
     nhg_info = nh_request.group_info.add()
     nhg_info.key.network_instance_name = network_instance
-    nhg_info.key.name = ipv6_link_local + '_v6_frr_sdk' # Must end with '_sdk'
-    nh = nhg_info.data.next_hop.add()
-    nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT
-    nh.type = nexthop_group_service_pb2.NextHop.REGULAR
+    nhg_info.key.name = str(if_index) + '_v6_frr_sdk' # Must end with '_sdk'
+    if ipv6_nexthop is not None:
+      nh = nhg_info.data.next_hop.add()
+      nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT
+      nh.type = nexthop_group_service_pb2.NextHop.REGULAR
 
-    # SRL does not allow link local address to be used as NH, use mapped ipv4
-    nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
-    # nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_link_local).packed # FAILS
+      # SRL does not allow link local address to be used as NH, use mapped ipv4
+      nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
+      # nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_link_local).packed # FAILS
 
     logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
     nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
     logging.info(f"NextHopGroupAddOrUpdate :: {nhg_response.status} {nhg_response.error_str}")
     return nhg_response.status != 0
 
-def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6,preference):
+def SDK_AddRoute(network_instance,if_index,ip_addr,prefix_len,preference):
     route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
     route_request = route_service_pb2.RouteAddRequest()
     route_info = route_request.routes.add()
@@ -292,10 +295,9 @@ def SDK_AddRoute(network_instance,ip_addr,prefix_len,via_v6,preference):
     route_info.key.ip_prefix.prefix_length = int(prefix_len)
 
     #
-    # TODO check what happens if NHG does not exist yet?
-    # Use oif in name of NHG instead? does not change, unlike ipv6 next hop
+    # Use oif in name of NHG instead of ipv6 of neighbor: oif known, does not change
     #
-    route_info.data.nexthop_group_name = via_v6 + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
+    route_info.data.nexthop_group_name = str(if_index) + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
 
     logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
     route_response = route_stub.RouteAddOrUpdate(request=route_request,metadata=metadata)
@@ -335,15 +337,15 @@ def Add_Route(network_instance, netlink_msg, preference):
     att4 = netlink_msg['attrs'][4]
     if att4[0] == "RTA_MULTIPATH":
       for v in att4[1]:
-         via_v6 = get_ipv6_nh( v['attrs'][0] )
+         # via_v6 = get_ipv6_nh( v['attrs'][0] )
          oif = v['oif']
-         logging.info( f"multipath[{via_v6},{oif}] Add_Route {prefix}/{length}" )
-         SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
+         logging.info( f"multipath[oif={oif}] Add_Route {prefix}/{length}" )
+         SDK_AddRoute(network_instance,oif,prefix,length,preference)
     else:
-      via_v6 = get_ipv6_nh( att4 )
+      # via_v6 = get_ipv6_nh( att4 )
       oif = netlink_msg['attrs'][5][1] # RTA_OIF
-      logging.info( f"Add_Route {prefix}/{length} via_v6={via_v6} oif={oif}" )
-      SDK_AddRoute(network_instance,prefix,length,via_v6,preference)
+      logging.info( f"Add_Route {prefix}/{length} oif={oif}" )
+      SDK_AddRoute(network_instance,oif,prefix,length,preference)
 
 def Del_Route(network_instance, netlink_msg):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
@@ -398,6 +400,7 @@ class MonitoringThread(Thread):
       logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
 
       params = self.state.network_instances[ self.net_inst ]
+      ipdb_interfaces = self.state.ipdbs[self.net_inst].interfaces
       try:
         todo = list( self.interfaces.keys() )
         while todo != []:
@@ -419,7 +422,10 @@ class MonitoringThread(Thread):
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
                       peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
-                      SDK_AddNHG( self.net_inst, peer_v4, neighbor, peer_v6 )
+                      intf_index = ipdb_interfaces[_i]['index'] # Matches 'oif' in netlink
+
+                      # Update NHG with ipv4/v6 addresses for peer
+                      SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
                       todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={todo}" )
 
@@ -430,6 +436,32 @@ class MonitoringThread(Thread):
 
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
+#
+# Adds or removes NHG for given interface
+# peer_as := internal | external | None (->remove)
+def UpdateBGPInterface(state,ni,intf,peer_as):
+    net_inst = ni['network_instance']
+    if peer_as is not None:
+       if net_inst in state.ipdbs:
+         logging.info( f"UpdateBGPInterface: Pre-creating NHG for {intf}" )
+         ipdb_interfaces = state.ipdbs[net_inst].interfaces
+         intf_index = ipdb_interfaces[intf]['index']
+         SDK_AddNHG( net_inst, intf_index ) # Make sure it exists, update later
+
+       ni['bgp_interfaces'][ intf ] = peer_as
+       cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
+               f"neighbor {intf} port {ni['frr_bgpd_port']}" ]
+    else:
+
+       # TODO remove NHG
+       ni['bgp_interfaces'].pop( intf, None )
+       cmd = [ f"no neighbor {intf}" ]
+
+    # If FRR daemons are running, update this interface
+    if 'frr' in ni and ni['frr']=='running':
+       if 'bgp' in ni and ni['bgp']=='enable':
+          ctxt = f"router bgp {ni['autonomous_system']}"
+          run_vtysh( ns=net_inst, context=ctxt, config=cmd )
 
 ##################################################################
 ## Updates configuration state based on 'config' notifications
@@ -569,22 +601,7 @@ def Handle_Notification(obj, state):
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             # lookup AS for this ns, check if enabled (i.e. daemon running)
             if ni != {}:
-                ni = state.network_instances[ net_inst ]
-                if peer_as is not None:
-                   ni['bgp_interfaces'][ intf ] = peer_as
-                   cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
-                           f"neighbor {intf} port {ni['frr_bgpd_port']}" ]
-                   # TODO add to route map to drop local routes
-                else:
-                   ni['bgp_interfaces'].pop( intf, None )
-                   cmd = [ f"no neighbor {intf}" ]
-
-                # If FRR daemons are running, update this interface
-                if 'frr' in ni and ni['frr']=='running':
-                   if 'bgp' in ni and ni['bgp']=='enable':
-                      ctxt = f"router bgp {ni['autonomous_system']}"
-                      run_vtysh( ns=net_inst, context=ctxt, config=cmd )
-
+                UpdateBGPInterface(state,ni,intf,peer_as)
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
                   "bgp_interfaces" : { intf : peer_as }
