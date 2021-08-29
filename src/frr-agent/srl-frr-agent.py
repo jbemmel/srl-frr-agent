@@ -334,7 +334,7 @@ def Add_Route(network_instance, netlink_msg, preference):
 
     att4 = netlink_msg['attrs'][4]
     if att4[0] == "RTA_MULTIPATH":
-      for v in att4[0][1]:
+      for v in att4[1]:
          via_v6 = get_ipv6_nh( v['attrs'][0] )
          oif = v['oif']
          logging.info( f"multipath[{via_v6},{oif}] Add_Route {prefix}/{length}" )
