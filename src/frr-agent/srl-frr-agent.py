@@ -151,7 +151,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
    # ips = list( map( str, subnet.hosts() ) )
    peerlinks = list(ipaddress.ip_network(link_local_range).subnets(new_prefix=31))
-   peer_link = peerlinks[ int(phys_sub[0].split('-')[1]) ]
+   peer_link = peerlinks[ int(phys_sub[0].split('-')[1]) - 1 ]
    ips = list( map( str, peer_link.hosts() ) )
 
    # For IPv6, build a /127 based on mapped ipv4 of lowest ID
