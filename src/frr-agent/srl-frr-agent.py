@@ -297,6 +297,7 @@ def SDK_AddRoute(network_instance,if_index,ip_addr,prefix_len,preference):
     #
     # Use oif in name of NHG instead of ipv6 of neighbor: oif known, does not change
     #
+    SDK_AddNHG(network_instance,if_index) # Make sure it exists
     route_info.data.nexthop_group_name = str(if_index) + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
 
     logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
@@ -442,11 +443,11 @@ class MonitoringThread(Thread):
 def UpdateBGPInterface(state,ni,intf,peer_as):
     net_inst = ni['network_instance']
     if peer_as is not None:
-       if net_inst in state.ipdbs:
-         logging.info( f"UpdateBGPInterface: Pre-creating NHG for {intf}" )
-         ipdb_interfaces = state.ipdbs[net_inst].interfaces
-         intf_index = ipdb_interfaces[intf]['index']
-         SDK_AddNHG( net_inst, intf_index ) # Make sure it exists, update later
+       #if net_inst in state.ipdbs:
+       # logging.info( f"UpdateBGPInterface: Pre-creating NHG for {intf}" )
+       # ipdb_interfaces = state.ipdbs[net_inst].interfaces
+       # intf_index = ipdb_interfaces[intf]['index']
+       # SDK_AddNHG( net_inst, intf_index ) # Make sure it exists, update later
 
        ni['bgp_interfaces'][ intf ] = peer_as
        cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
