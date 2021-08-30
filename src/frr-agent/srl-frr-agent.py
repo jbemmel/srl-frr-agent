@@ -157,15 +157,16 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # ips = list( map( str, subnet.hosts() ) )
    ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
-   # For IPv6, build a /127 based on mapped ipv4 of highest ID
+   # For IPv6, build a /127 based on mapped ipv4 of  2 * highest ID
    # (assuming leaves have higher IDs than spines)
-   highest_id = str( max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) ) )
-   mapped_v4 = '::ffff:' + highest_id # Or 'regular' v6: '2001::ffff:'
+   highest_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+   ip31 = str( ipaddress.ip_address( 2*int(highest_ip) ) ) # Create room for /31
+   mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
    v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
    _i = v6_ips.index( str(ipaddress.ip_address(mapped_v4)) )
-   local_v6 = v6_ips[ _i if local_ip == highest_id else (1-_i) ]
-   peer_v6  = v6_ips[ (1-_i) if local_ip == highest_id else _i ]
+   local_v6 = v6_ips[ _i if local_ip == str(highest_ip) else (1-_i) ]
+   peer_v6  = v6_ips[ (1-_i) if local_ip == str(highest_ip) else _i ]
    logging.info( f"ConfigurePeerIPMAC v6={v6_ips} local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
@@ -449,17 +450,17 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['config']['bgp_link_local_range'], gnmi_stub )
+                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, cfg['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       intf_index = ipdb.interfaces[_i]['index'] # Matches 'oif' in netlink
 
                       # Update NHGs with ipv4/v6 addresses for peer
                       # SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
-                      params[ 'v4' ][ peer_v4 ] = True
-                      params[ 'v6' ][ peer_v6 ] = True
-                      SDK_AddNHG(self.net_inst,"v4",params[ 'v4' ])
+                      ni[ 'v4' ][ peer_v4 ] = True
+                      ni[ 'v6' ][ peer_v6 ] = True
+                      SDK_AddNHG(self.net_inst,"v4",ni[ 'v4' ])
                       SDK_AddNHG(self.net_inst,f"v4_{intf_index}",[peer_v4])
-                      SDK_AddNHG(self.net_inst,"v6",params[ 'v6' ])
+                      SDK_AddNHG(self.net_inst,"v6",ni[ 'v6' ])
                       SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[peer_v6])
 
                       todo.remove( _i )
