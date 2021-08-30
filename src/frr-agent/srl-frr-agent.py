@@ -456,7 +456,8 @@ class MonitoringThread(Thread):
 # Adds or removes NHG for given interface
 # peer_as := internal | external | None (->remove)
 def UpdateBGPInterface(ni,intf,peer_as):
-    net_inst = ni['network_instance']
+    cfg = ni['config']
+    net_inst = cfg['network_instance']
     if peer_as is not None:
        ni['bgp_interfaces'][ intf ] = peer_as
        cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
@@ -468,8 +469,8 @@ def UpdateBGPInterface(ni,intf,peer_as):
 
     # If FRR daemons are running, update this interface
     if 'frr' in ni and ni['frr']=='running':
-       if 'bgp' in ni and ni['bgp']=='enable':
-          ctxt = f"router bgp {ni['autonomous_system']}"
+       if 'bgp' in cfg and cfg['bgp']=='enable':
+          ctxt = f"router bgp {cfg['autonomous_system']}"
           run_vtysh( ns=net_inst, context=ctxt, config=cmd )
 
 ##################################################################
@@ -564,7 +565,7 @@ def Handle_Notification(obj, state):
                     cfg = ni['config']
                     if "bgpd" in enabled_daemons:
                       lines = ""
-                      for name,peer_as in cfg['bgp_interfaces'].items():
+                      for name,peer_as in ni['bgp_interfaces'].items():
                         # Add single indent space at end
                         lines += f'neighbor {name} interface remote-as {peer_as}\n '
                         # Use configured BGP port, custom patch
@@ -575,7 +576,7 @@ def Handle_Notification(obj, state):
                     if 'openfabric_name' in params:
                       _of = params['openfabric_name' ]
                       lines2 = ""
-                      for _if in cfg['openfabric_interfaces']:
+                      for _if in ni['openfabric_interfaces']:
                         # Add single indent space for each sub line
                         lines2 += f'\ninterface {_if}\n ip router openfabric {_of}'
                         if _if[0:2] == "lo":
@@ -583,7 +584,7 @@ def Handle_Notification(obj, state):
                         lines2 += "\n!"
                       params[ "openfabric_interface_lines" ] = lines2
                 else:
-                    state.network_instances[ net_inst ] = { "config" : { "bgp_interfaces" : {}, "openfabric_interfaces" : {} } }
+                    state.network_instances[ net_inst ] = { "bgp_interfaces" : {}, "openfabric_interfaces" : {} }
 
             if updateParam( "enabled_daemons"," ".join( enabled_daemons ) ):
                state.network_instances[ net_inst ]['frr'] = 'restart' # something other than 'running' or 'stopped'
@@ -620,11 +621,11 @@ def Handle_Notification(obj, state):
               SDK_AddNHG(net_inst,f"v6_{intf_index}")
 
             # lookup AS for this ns, check if enabled (i.e. daemon running)
-            if 'config' in ni:
-                UpdateBGPInterface(ni['config'],intf,peer_as)
+            if 'bgp_interfaces' in ni:
+                UpdateBGPInterface(ni,intf,peer_as)
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
-                  "config" : { "bgp_interfaces" : { intf : peer_as } }
+                  "bgp_interfaces" : { intf : peer_as }
                 }
 
         elif obj.config.key.js_path == ".network_instance.interface.openfabric":
@@ -637,7 +638,7 @@ def Handle_Notification(obj, state):
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             if 'config' in ni:
                 cfg = ni['config']
-                cfg['openfabric_interfaces'][ intf ] = True
+                ni['openfabric_interfaces'][ intf ] = True
 
                 if 'frr' in ni and ni['frr']=='running':
                   if 'openfabric' in cfg and cfg['openfabric']=='enable':
@@ -711,20 +712,20 @@ def UpdateDaemons( state, modified_netinstances ):
        # Register route handler before starting daemons / adding interfaces
        if 'bgp' in cfg and cfg['bgp']=='enable':
           if n not in state.ipdbs:
-            logging.info( f"About to start route handler; interfaces={cfg['bgp_interfaces']}")
+            logging.info( f"About to start route handler; interfaces={ni['bgp_interfaces']}")
             ni['v4'] = {} # Start list of IPv4 nexthops
             ni['v6'] = {}
             state.ipdbs[n] = RegisterRouteHandler(n,
-                               int(cfg['bgp_preference']), cfg['bgp_interfaces'] )
+                               int(cfg['bgp_preference']), ni['bgp_interfaces'] )
 
        # First, (re)start or stop FRR daemons
        if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
           script_update_frr( **cfg )
           ni['frr'] = 'running' if ni['admin_state']=='enable' else 'stopped'
 
-       if 'bgp' in cfg and cfg['bgp']=='enable' and cfg['bgp_interfaces']!={}:
+       if 'bgp' in cfg and cfg['bgp']=='enable' and ni['bgp_interfaces']!={}:
           # TODO shouldn't run monitoringthread more than once per interface
-          MonitoringThread( state, n, cfg['bgp_interfaces'] ).start()
+          MonitoringThread( state, n, ni['bgp_interfaces'] ).start()
 
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.
