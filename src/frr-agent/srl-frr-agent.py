@@ -622,7 +622,7 @@ def Handle_Notification(obj, state):
               SDK_AddNHG(net_inst,f"v6_{intf_index}")
 
             # lookup AS for this ns, check if enabled (i.e. daemon running)
-            if 'bgp_interfaces' in ni:
+            if 'config' in ni and 'frr' in ni and ni['frr'] == "running":
                 UpdateBGPInterface(ni,intf,peer_as)
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
