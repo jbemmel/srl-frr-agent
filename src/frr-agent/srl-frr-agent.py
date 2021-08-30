@@ -159,7 +159,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
 
    # For IPv6, build a /127 based on mapped ipv4 of highest ID
    # (assuming leaves have higher IDs than spines)
-   highest_id = max(local_ip,peer_ip)
+   highest_id = str( max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) ) )
    mapped_v4 = '::ffff:' + highest_id # Or 'regular' v6: '2001::ffff:'
    v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
@@ -698,7 +698,6 @@ def run_vtysh(ns,context='',show=[],config=[]):
 
 class State(object):
     def __init__(self):
-        self.admin_state = None       # May not be set in config
         self.network_instances = {}   # Indexed by name
         self.ipdbs = {}               # Indexed by name
         # TODO more properties
