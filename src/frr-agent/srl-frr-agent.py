@@ -362,15 +362,20 @@ def Del_Route(network_instance, netlink_msg):
 #
 def RegisterRouteHandler(net_inst,preference,interfaces):
   logging.info( f"RegisterRouteHandler({net_inst},preference={preference})" )
+
+  # Need to do this in a separate thread, not same as processing config
   ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
 
   # Create placeholders for NextHop groups
   SDK_AddNHG(net_inst,'v4') # "all" interfaces, ipv4
   SDK_AddNHG(net_inst,'v6') # "all" interfaces, ipv6
   for i in interfaces:
-      logging.info( f"RegisterRouteHandler: Pre-creating NHGs for {i}" )
-      SDK_AddNHG(net_inst,f"v4_{ipdb.interfaces[i]['index']}")
-      SDK_AddNHG(net_inst,f"v6_{ipdb.interfaces[i]['index']}")
+      logging.info( f"RegisterRouteHandler: Pre-creating NHGs for '{i}'" )
+      if i in ipdb.interfaces:
+         SDK_AddNHG(net_inst,f"v4_{ipdb.interfaces[i]['index']}")
+         SDK_AddNHG(net_inst,f"v6_{ipdb.interfaces[i]['index']}")
+      else:
+         logging.error( f"Interface not found in IPDB: '{i}'? {ipdb.interfaces}" )
 
   # Register our callback to the IPDB
   def netlink_callback(ipdb, msg, action):
@@ -403,14 +408,28 @@ class MonitoringThread(Thread):
        grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
    def run(self):
+      logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
+
+      ni = self.state.network_instances[ self.net_inst ]
+      cfg = ni['config']
+      if self.net_inst in self.state.ipdbs:
+         ipdb = self.state.ipdbs[ self.net_inst ]
+      else:
+         ni['v4'] = {} # Start list of IPv4 nexthops
+         ni['v6'] = {}
+         ipdb = RegisterRouteHandler( self.net_inst,
+                                      int(cfg['bgp_preference']),
+                                      self.interfaces )
+         self.state.ipdbs[ self.net_inst ] = ipdb
+
+      # (re)start or stop FRR daemons
+      if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
+         script_update_frr( **cfg )
+         ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
 
       # Create per-thread gNMI stub, using a global channel
       gnmi_stub = gNMIStub( gnmi_channel )
 
-      logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
-
-      params = self.state.network_instances[ self.net_inst ]
-      ipdb_interfaces = self.state.ipdbs[self.net_inst].interfaces
       try:
         todo = list( self.interfaces.keys() )
         while todo != []:
@@ -432,7 +451,7 @@ class MonitoringThread(Thread):
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
                       peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['config']['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
-                      intf_index = ipdb_interfaces[_i]['index'] # Matches 'oif' in netlink
+                      intf_index = ipdb.interfaces[_i]['index'] # Matches 'oif' in netlink
 
                       # Update NHGs with ipv4/v6 addresses for peer
                       # SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
@@ -584,11 +603,15 @@ def Handle_Notification(obj, state):
                         lines2 += "\n!"
                       params[ "openfabric_interface_lines" ] = lines2
                 else:
-                    state.network_instances[ net_inst ] = { "bgp_interfaces" : {}, "openfabric_interfaces" : {}, "config" : {} }
+                    ni = { "bgp_interfaces" : {}, "openfabric_interfaces" : {}, "config" : {} }
 
             if updateParam( "enabled_daemons"," ".join( enabled_daemons ) ):
-               state.network_instances[ net_inst ].update( { 'frr' : 'restart' } ) # something other than 'running' or 'stopped'
-            state.network_instances[ net_inst ]['config'].update( **params )
+               ni.update( { 'frr' : 'restart' } ) # something other than 'running' or 'stopped'
+            if 'config' in ni:
+                ni['config'].update( **params )
+            else:
+                ni['config'] = params
+            state.network_instances[ net_inst ] = ni
 
         # Tends to come first (always?) when full blob is configured
         elif (obj.config.key.js_path == ".network_instance.interface"
@@ -707,24 +730,11 @@ class State(object):
 def UpdateDaemons( state, modified_netinstances ):
     for n in modified_netinstances:
        ni = state.network_instances[ n ]
-       cfg = ni['config'] if 'config' in ni else {}
-       # Register route handler before starting daemons / adding interfaces
-       if 'bgp' in cfg and cfg['bgp']=='enable':
-          if n not in state.ipdbs:
-            logging.info( f"About to start route handler; interfaces={ni['bgp_interfaces']}")
-            ni['v4'] = {} # Start list of IPv4 nexthops
-            ni['v6'] = {}
-            state.ipdbs[n] = RegisterRouteHandler(n,
-                               int(cfg['bgp_preference']), ni['bgp_interfaces'] )
 
-       # First, (re)start or stop FRR daemons
-       if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
-          script_update_frr( **cfg )
-          ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
+       interfaces = ni['bgp_interfaces'] if 'bgp_interfaces' in ni else []
 
-       if 'bgp' in cfg and cfg['bgp']=='enable' and ni['bgp_interfaces']!={}:
-          # TODO shouldn't run monitoringthread more than once per interface
-          MonitoringThread( state, n, ni['bgp_interfaces'] ).start()
+       # TODO shouldn't run monitoringthread more than once per interface
+       MonitoringThread( state, n, interfaces ).start()
 
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.
