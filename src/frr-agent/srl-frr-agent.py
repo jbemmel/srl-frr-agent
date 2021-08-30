@@ -157,14 +157,15 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # ips = list( map( str, subnet.hosts() ) )
    ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
-   # For IPv6, build a /127 based on mapped ipv4 of lowest ID
-   lowest_id = min(local_ip,peer_ip)
-   mapped_v4 = '::ffff:' + lowest_id # Or 'regular' v6: '2001::ffff:'
+   # For IPv6, build a /127 based on mapped ipv4 of highest ID
+   # (assuming leaves have higher IDs than spines)
+   highest_id = max(local_ip,peer_ip)
+   mapped_v4 = '::ffff:' + highest_id # Or 'regular' v6: '2001::ffff:'
    v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
    _i = v6_ips.index( str(ipaddress.ip_address(mapped_v4)) )
-   local_v6 = v6_ips[ _i if local_ip == lowest_id else (1-_i) ]
-   peer_v6  = v6_ips[ (1-_i) if local_ip == lowest_id else _i ]
+   local_v6 = v6_ips[ _i if local_ip == highest_id else (1-_i) ]
+   peer_v6  = v6_ips[ (1-_i) if local_ip == highest_id else _i ]
    logging.info( f"ConfigurePeerIPMAC v6={v6_ips} local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
@@ -190,7 +191,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
      },
      "ipv6" : {
         "address" : [
-           # Use ipv4 mapped address, /127 around lowest of router IDs
+           # Use ipv4 mapped address, /127 around highest of router IDs
            { "ip-prefix" : local_v6 + "/127",
              "primary": '[null]'  # type 'empty'
            }
@@ -429,7 +430,7 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['bgp_link_local_range'], gnmi_stub )
+                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, params['config']['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       intf_index = ipdb_interfaces[_i]['index'] # Matches 'oif' in netlink
 
@@ -461,7 +462,7 @@ def UpdateBGPInterface(ni,intf,peer_as):
     if peer_as is not None:
        ni['bgp_interfaces'][ intf ] = peer_as
        cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
-               f"neighbor {intf} port {ni['frr_bgpd_port']}" ]
+               f"neighbor {intf} port {cfg['frr_bgpd_port']}" ]
     else:
        # TODO remove NHG
        ni['bgp_interfaces'].pop( intf, None )
@@ -721,7 +722,7 @@ def UpdateDaemons( state, modified_netinstances ):
        # First, (re)start or stop FRR daemons
        if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
           script_update_frr( **cfg )
-          ni['frr'] = 'running' if ni['admin_state']=='enable' else 'stopped'
+          ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
 
        if 'bgp' in cfg and cfg['bgp']=='enable' and ni['bgp_interfaces']!={}:
           # TODO shouldn't run monitoringthread more than once per interface
