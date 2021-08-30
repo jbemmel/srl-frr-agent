@@ -562,8 +562,7 @@ def Handle_Notification(obj, state):
                    params[ "openfabric" ] = "disable"
 
                 # Could dynamically create CPM filter for IP proto 88
-                if 'config' in ni:
-                    cfg = ni['config']
+                if 'bgp_interfaces' in ni:
                     if "bgpd" in enabled_daemons:
                       lines = ""
                       for name,peer_as in ni['bgp_interfaces'].items():
@@ -588,7 +587,7 @@ def Handle_Notification(obj, state):
                     state.network_instances[ net_inst ] = { "bgp_interfaces" : {}, "openfabric_interfaces" : {}, "config" : {} }
 
             if updateParam( "enabled_daemons"," ".join( enabled_daemons ) ):
-               state.network_instances[ net_inst ]['frr'] = 'restart' # something other than 'running' or 'stopped'
+               state.network_instances[ net_inst ].update( { 'frr' : 'restart' } ) # something other than 'running' or 'stopped'
             state.network_instances[ net_inst ]['config'].update( **params )
 
         # Tends to come first (always?) when full blob is configured
