@@ -357,10 +357,16 @@ def Del_Route(network_instance, netlink_msg):
 
 #
 # Registers an IPDB callback handler for route events in the given VRF instance
+# optional initial set of interfaces to create placeholder NHGs for
 #
-def RegisterRouteHandler(net_inst,preference):
+def RegisterRouteHandler(net_inst,preference,interfaces):
   logging.info( f"RegisterRouteHandler({net_inst},preference={preference})" )
   ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
+
+  # Create placeholders for NextHop groups
+  for i in interfaces:
+      logging.info( f"RegisterRouteHandler: Pre-creating NHG for {i}" )
+      SDK_AddNHG(net_inst,ipdb.interfaces[i]['index'])
 
   # Register our callback to the IPDB
   def netlink_callback(ipdb, msg, action):
@@ -693,7 +699,8 @@ def UpdateDaemons( state, modified_netinstances ):
        if 'bgp' in ni and ni['bgp']=='enable':
           if n not in state.ipdbs:
             logging.info( f"About to start route handler; interfaces={ni['bgp_interfaces']}")
-            state.ipdbs[n] = RegisterRouteHandler(n, int(ni['bgp_preference']) )
+            state.ipdbs[n] = RegisterRouteHandler(n,
+                               int(ni['bgp_preference']), ni['bgp_interfaces'] )
 
        # First, (re)start or stop FRR daemons
        if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
