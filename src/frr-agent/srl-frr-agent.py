@@ -584,7 +584,7 @@ def Handle_Notification(obj, state):
                         lines2 += "\n!"
                       params[ "openfabric_interface_lines" ] = lines2
                 else:
-                    state.network_instances[ net_inst ] = { "bgp_interfaces" : {}, "openfabric_interfaces" : {} }
+                    state.network_instances[ net_inst ] = { "bgp_interfaces" : {}, "openfabric_interfaces" : {}, "config" : {} }
 
             if updateParam( "enabled_daemons"," ".join( enabled_daemons ) ):
                state.network_instances[ net_inst ]['frr'] = 'restart' # something other than 'running' or 'stopped'
