@@ -248,6 +248,7 @@ def gNMI_Set( gnmi_stub, path, data ):
          raise err
 
 def SDK_AddNHG( network_instance, if_index, ip_nexthop=None, ipv6_nexthop=None):
+    logging.info(f"SDK_AddNHG :: if_index={if_index} v4={ip_nexthop} v6={ipv6_nexthop}")
     nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
     nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
 
@@ -258,7 +259,7 @@ def SDK_AddNHG( network_instance, if_index, ip_nexthop=None, ipv6_nexthop=None):
 
     if ip_nexthop is not None:
       nh = nhg_info.data.next_hop.add()
-      nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT? LOCAL?
+      nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT  # INDIRECT? LOCAL?
       nh.type = nexthop_group_service_pb2.NextHop.REGULAR
       nh.ip_nexthop.addr = ipaddress.ip_address(ip_nexthop).packed
 
@@ -268,7 +269,7 @@ def SDK_AddNHG( network_instance, if_index, ip_nexthop=None, ipv6_nexthop=None):
     nhg_info.key.name = str(if_index) + '_v6_frr_sdk' # Must end with '_sdk'
     if ipv6_nexthop is not None:
       nh = nhg_info.data.next_hop.add()
-      nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT
+      nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT  # INDIRECT?
       nh.type = nexthop_group_service_pb2.NextHop.REGULAR
 
       # SRL does not allow link local address to be used as NH, use mapped ipv4
@@ -277,13 +278,13 @@ def SDK_AddNHG( network_instance, if_index, ip_nexthop=None, ipv6_nexthop=None):
 
     logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
     nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
-    logging.info(f"NextHopGroupAddOrUpdate :: {nhg_response.status} {nhg_response.error_str}")
+    logging.info(f"NextHopGroupAddOrUpdate :: status={nhg_response.status} err={nhg_response.error_str}")
     return nhg_response.status != 0
 
 def SDK_AddRoute(network_instance,if_index,ip_addr,prefix_len,preference):
     route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
     route_request = route_service_pb2.RouteAddRequest()
-    route_info = route_request.routes.add()
+    route_info = route_request.routes.add() # Could add multiple
     route_info.data.preference = preference
 
     # Could configure defaults for these in the agent Yang params
@@ -297,7 +298,7 @@ def SDK_AddRoute(network_instance,if_index,ip_addr,prefix_len,preference):
     #
     # Use oif in name of NHG instead of ipv6 of neighbor: oif known, does not change
     #
-    SDK_AddNHG(network_instance,if_index) # Make sure it exists
+    # SDK_AddNHG(network_instance,if_index) # Make sure it exists? Resets IPs :(
     route_info.data.nexthop_group_name = str(if_index) + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
 
     logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
@@ -440,20 +441,13 @@ class MonitoringThread(Thread):
 #
 # Adds or removes NHG for given interface
 # peer_as := internal | external | None (->remove)
-def UpdateBGPInterface(state,ni,intf,peer_as):
+def UpdateBGPInterface(ni,intf,peer_as):
     net_inst = ni['network_instance']
     if peer_as is not None:
-       #if net_inst in state.ipdbs:
-       # logging.info( f"UpdateBGPInterface: Pre-creating NHG for {intf}" )
-       # ipdb_interfaces = state.ipdbs[net_inst].interfaces
-       # intf_index = ipdb_interfaces[intf]['index']
-       # SDK_AddNHG( net_inst, intf_index ) # Make sure it exists, update later
-
        ni['bgp_interfaces'][ intf ] = peer_as
        cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
                f"neighbor {intf} port {ni['frr_bgpd_port']}" ]
     else:
-
        # TODO remove NHG
        ni['bgp_interfaces'].pop( intf, None )
        cmd = [ f"no neighbor {intf}" ]
@@ -600,9 +594,17 @@ def Handle_Notification(obj, state):
                   logging.info(f"TODO: process openfabric interface config : {_i['openfabric']}")
 
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
+
+            # Make sure NHG exists, update with IPs later
+            if peer_as is not None and net_inst in state.ipdbs:
+              logging.info( f"Pre-creating NHG for {intf}" )
+              ipdb_interfaces = state.ipdbs[net_inst].interfaces
+              intf_index = ipdb_interfaces[intf]['index']
+              SDK_AddNHG( net_inst, intf_index )
+
             # lookup AS for this ns, check if enabled (i.e. daemon running)
             if ni != {}:
-                UpdateBGPInterface(state,ni,intf,peer_as)
+                UpdateBGPInterface(ni,intf,peer_as)
             elif peer_as is not None:
                 state.network_instances[ net_inst ] = {
                   "bgp_interfaces" : { intf : peer_as }
