@@ -1,8 +1,8 @@
 {
   "auto_config_agent:auto-config-agent": {
     "role": "leaf",
-    "use-bgp-unnumbered": false,
-    "use-ospfv3": true,
+    "use-bgp-unnumbered": true,
+    "use-ospfv3": false,
     "use-evpn": true
   },
   "srl_nokia-acl:acl": {

@@ -359,10 +359,8 @@ def Del_Route(network_instance, netlink_msg):
 # Registers an IPDB callback handler for route events in the given VRF instance
 #
 def RegisterRouteHandler(net_inst,preference):
+  logging.info( f"RegisterRouteHandler({net_inst},preference={preference})" )
   ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
-
-  # Need interface index to resolve nexthop routes?
-  # logging.info( f"IPDB interfaces:{ipdb.interfaces}" )
 
   # Register our callback to the IPDB
   def netlink_callback(ipdb, msg, action):
@@ -691,6 +689,12 @@ def UpdateDaemons( state, modified_netinstances ):
     for n in modified_netinstances:
        ni = state.network_instances[ n ]
 
+       # Register route handler before starting daemons / adding interfaces
+       if 'bgp' in ni and ni['bgp']=='enable':
+          if n not in state.ipdbs:
+            logging.info( f"About to start route handler; interfaces={ni['bgp_interfaces']}")
+            state.ipdbs[n] = RegisterRouteHandler(n, int(ni['bgp_preference']) )
+
        # First, (re)start or stop FRR daemons
        if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
           params = { **ni, "bgp_interfaces" : "" } # Override dict
@@ -698,12 +702,8 @@ def UpdateDaemons( state, modified_netinstances ):
           ni['frr'] = 'running' if ni['admin_state']=='enable' else 'stopped'
 
        if 'bgp' in ni and ni['bgp']=='enable' and ni['bgp_interfaces']!={}:
-
-           if n not in state.ipdbs:
-              state.ipdbs[n] = RegisterRouteHandler(n, int(ni['bgp_preference']) )
-
-           # TODO shouldn't run monitoringthread more than once per interface
-           MonitoringThread( state, n, ni['bgp_interfaces'] ).start()
+          # TODO shouldn't run monitoringthread more than once per interface
+          MonitoringThread( state, n, ni['bgp_interfaces'] ).start()
 
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.
