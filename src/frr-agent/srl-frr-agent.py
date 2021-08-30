@@ -247,41 +247,32 @@ def gNMI_Set( gnmi_stub, path, data ):
              return res
          raise err
 
-def SDK_AddNHG( network_instance, if_index, ip_nexthop=None, ipv6_nexthop=None):
-    logging.info(f"SDK_AddNHG :: if_index={if_index} v4={ip_nexthop} v6={ipv6_nexthop}")
+#
+# Creates a next hop group using the SDK
+# @param ip_nexthops: Optional list of next hop IPs (should be same version)
+#
+def SDK_AddNHG( network_instance, name, ip_nexthops=[] ):
+    logging.info(f"SDK_AddNHG :: name={name} ip_nexthops={ip_nexthops}")
     nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
     nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
 
     # IPv4
     nhg_info = nh_request.group_info.add()
     nhg_info.key.network_instance_name = network_instance
-    nhg_info.key.name = str(if_index) + '_v4_frr_sdk' # Must end with '_sdk'
+    nhg_info.key.name = name + '_sdk' # Must end with '_sdk'
 
-    if ip_nexthop is not None:
+    for ip in ip_nexthops:
       nh = nhg_info.data.next_hop.add()
       nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT  # INDIRECT? LOCAL?
       nh.type = nexthop_group_service_pb2.NextHop.REGULAR
-      nh.ip_nexthop.addr = ipaddress.ip_address(ip_nexthop).packed
-
-    # IPv6
-    nhg_info = nh_request.group_info.add()
-    nhg_info.key.network_instance_name = network_instance
-    nhg_info.key.name = str(if_index) + '_v6_frr_sdk' # Must end with '_sdk'
-    if ipv6_nexthop is not None:
-      nh = nhg_info.data.next_hop.add()
-      nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT  # INDIRECT?
-      nh.type = nexthop_group_service_pb2.NextHop.REGULAR
-
-      # SRL does not allow link local address to be used as NH, use mapped ipv4
-      nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
-      # nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_link_local).packed # FAILS
+      nh.ip_nexthop.addr = ipaddress.ip_address(ip).packed
 
     logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
     nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
     logging.info(f"NextHopGroupAddOrUpdate :: status={nhg_response.status} err={nhg_response.error_str}")
     return nhg_response.status != 0
 
-def SDK_AddRoute(network_instance,if_index,ip_addr,prefix_len,preference):
+def SDK_AddRoute(network_instance,nhg_name,ip_addr,prefix_len,preference):
     route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
     route_request = route_service_pb2.RouteAddRequest()
     route_info = route_request.routes.add() # Could add multiple
@@ -296,10 +287,15 @@ def SDK_AddRoute(network_instance,if_index,ip_addr,prefix_len,preference):
     route_info.key.ip_prefix.prefix_length = int(prefix_len)
 
     #
-    # Use oif in name of NHG instead of ipv6 of neighbor: oif known, does not change
+    # SDK allows to either specify a NHG name, or a list of nexthop IPs
     #
-    # SDK_AddNHG(network_instance,if_index) # Make sure it exists? Resets IPs :(
-    route_info.data.nexthop_group_name = str(if_index) + f'_v{ip.version}_frr_sdk' # Must end with '_sdk'
+    route_info.data.nexthop_group_name = nhg_name + '_sdk' # Must end with '_sdk'
+    # for _i in nexthop_ips:
+    #    nexthop = route_info.nexthop.add()
+    #    nh.resolve_to = route_service_pb2.NextHop.DIRECT  # INDIRECT?
+    #    nh.type = route_service_pb2.NextHop.REGULAR
+        # SRL does not allow link local address to be used as NH, use mapped ipv4
+    #    nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
 
     logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
     route_response = route_stub.RouteAddOrUpdate(request=route_request,metadata=metadata)
@@ -326,6 +322,7 @@ def Add_Route(network_instance, netlink_msg, preference):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
     length = netlink_msg['dst_len']
     # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
+    version = "v6" if netlink_msg['family'] == 10 else "v4"
 
     def get_ipv6_nh(attrs):
         if attrs[0] == "RTA_VIA":
@@ -338,16 +335,19 @@ def Add_Route(network_instance, netlink_msg, preference):
 
     att4 = netlink_msg['attrs'][4]
     if att4[0] == "RTA_MULTIPATH":
-      for v in att4[1]:
+      # for v in att4[1]:
          # via_v6 = get_ipv6_nh( v['attrs'][0] )
-         oif = v['oif']
-         logging.info( f"multipath[oif={oif}] Add_Route {prefix}/{length}" )
-         SDK_AddRoute(network_instance,oif,prefix,length,preference)
+      #     oif = v['oif']
+      #     logging.info( f"multipath[oif={oif}] Add_Route {prefix}/{length}" )
+      #     SDK_AddRoute(network_instance,oif,prefix,length,preference)
+
+      # For now, assume *all* interfaces are listed
+      SDK_AddRoute(network_instance,version,prefix,length,preference)
     else:
       # via_v6 = get_ipv6_nh( att4 )
       oif = netlink_msg['attrs'][5][1] # RTA_OIF
       logging.info( f"Add_Route {prefix}/{length} oif={oif}" )
-      SDK_AddRoute(network_instance,oif,prefix,length,preference)
+      SDK_AddRoute(network_instance,f"{version}_{oif}",prefix,length,preference)
 
 def Del_Route(network_instance, netlink_msg):
     prefix = netlink_msg['attrs'][1][1] # RTA_DST
@@ -364,9 +364,12 @@ def RegisterRouteHandler(net_inst,preference,interfaces):
   ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
 
   # Create placeholders for NextHop groups
+  SDK_AddNHG(net_inst,'v4') # "all" interfaces, ipv4
+  SDK_AddNHG(net_inst,'v6') # "all" interfaces, ipv6
   for i in interfaces:
-      logging.info( f"RegisterRouteHandler: Pre-creating NHG for {i}" )
-      SDK_AddNHG(net_inst,ipdb.interfaces[i]['index'])
+      logging.info( f"RegisterRouteHandler: Pre-creating NHGs for {i}" )
+      SDK_AddNHG(net_inst,f"v4_{ipdb.interfaces[i]['index']}")
+      SDK_AddNHG(net_inst,f"v6_{ipdb.interfaces[i]['index']}")
 
   # Register our callback to the IPDB
   def netlink_callback(ipdb, msg, action):
@@ -430,8 +433,15 @@ class MonitoringThread(Thread):
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       intf_index = ipdb_interfaces[_i]['index'] # Matches 'oif' in netlink
 
-                      # Update NHG with ipv4/v6 addresses for peer
-                      SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
+                      # Update NHGs with ipv4/v6 addresses for peer
+                      # SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
+                      params[ 'v4' ].append( peer_v4 )
+                      params[ 'v6' ].append( peer_v6 )
+                      SDK_AddNHG(net_inst,"v4",params[ 'v4' ])
+                      SDK_AddNHG(net_inst,f"v4_{ipdb.interfaces[i]['index']}",[peer_v4])
+                      SDK_AddNHG(net_inst,"v6",params[ 'v6' ])
+                      SDK_AddNHG(net_inst,f"v6_{ipdb.interfaces[i]['index']}",[peer_v6])
+
                       todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={todo}" )
 
@@ -599,12 +609,13 @@ def Handle_Notification(obj, state):
 
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
 
-            # Make sure NHG exists, update with IPs later
+            # Make sure NHGs exists, update with IPs later
             if peer_as is not None and net_inst in state.ipdbs:
               logging.info( f"Pre-creating NHG for {intf}" )
               ipdb_interfaces = state.ipdbs[net_inst].interfaces
               intf_index = ipdb_interfaces[intf]['index']
-              SDK_AddNHG( net_inst, intf_index )
+              SDK_AddNHG(net_inst,f"v4_{intf_index}")
+              SDK_AddNHG(net_inst,f"v6_{intf_index}")
 
             # lookup AS for this ns, check if enabled (i.e. daemon running)
             if ni != {}:
@@ -699,6 +710,8 @@ def UpdateDaemons( state, modified_netinstances ):
        if 'bgp' in ni and ni['bgp']=='enable':
           if n not in state.ipdbs:
             logging.info( f"About to start route handler; interfaces={ni['bgp_interfaces']}")
+            ni['v4'] = [] # Start list of IPv4 nexthops
+            ni['v6'] = []
             state.ipdbs[n] = RegisterRouteHandler(n,
                                int(ni['bgp_preference']), ni['bgp_interfaces'] )
 
@@ -727,6 +740,10 @@ def Run():
 
     # TestAddLinkLocal_Nexthop_Group('link_local','169.254.0.1')
     # TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
+
+    # Test: create dummy ECMP route pair
+    SDK_AddNHG( "default", "dummy", [ "192.0.0.1", "192.0.0.3" ] )
+    SDK_AddRoute( "default", "dummy", "66.66.66.66", 32, preference=99 )
 
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
