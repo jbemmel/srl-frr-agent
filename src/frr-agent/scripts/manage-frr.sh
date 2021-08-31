@@ -120,6 +120,7 @@ router bgp $autonomous_system
  exit-address-family
  !
 ip prefix-list link-local seq 5 permit ${bgp_link_local_range} ge 31 le 32
+ip prefix-list link-local seq 10 permit fc00::/127 ge 127 le 128
 !
 route-map drop_interface_routes deny 10
  match ip address prefix-list link-local

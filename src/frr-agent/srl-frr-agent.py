@@ -285,7 +285,7 @@ def SDK_AddNHG( network_instance, name, ip_nexthops=[] ):
 
     for ip in ip_nexthops:
       nh = nhg_info.data.next_hop.add()
-      nh.resolve_to = nexthop_group_service_pb2.NextHop.DIRECT  # INDIRECT? LOCAL?
+      nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT? LOCAL?
       nh.type = nexthop_group_service_pb2.NextHop.REGULAR
       nh.ip_nexthop.addr = ipaddress.ip_address(ip).packed
 
