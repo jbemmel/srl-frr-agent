@@ -167,10 +167,10 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    def CalcIPv6LinkIPs():
       lo_ip = min( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
       hi_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
-      private = ipaddress.ip_address( "fc00::" )
-      ip_int = int(private) << 65 + int(hi_ip) << 33 + int(lo_ip) << 1
-      ip = ipaddress.ip_address( ip_int )
-      v6_subnet = ipaddress.ip_network( str(ip) + '/127', strict=False )
+      lo = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(lo_ip).split('.')))
+      hi = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(hi_ip).split('.')))
+      private_v6 = ipaddress.ip_address( f"fc00:{hi}:{lo}::" )
+      v6_subnet = ipaddress.ip_network( str(private_v6) + '/127', strict=False )
       i6 = list( map( str, v6_subnet.hosts() ) )
       return ( i6[0], i6[1] ) if local_ip == str(lo_ip) else ( i6[1], i6[0] )
 
