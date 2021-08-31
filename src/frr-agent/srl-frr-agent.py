@@ -147,6 +147,12 @@ def GetLinkLocalIPs( phys_intf, link_local_range ):
    peer_link = peerlinks[ int(phys_intf.split('-')[1]) - 1 ]
    return list( map( str, peer_link.hosts() ) )
 
+#
+# Statically configures both an IPv4 and an IPv6 address on the given interface
+#
+# IPv4: for local resolution to the nexthop MAC
+# IPv6: SRL does not support using link local IPv6 address as next hop
+#
 def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stub ):
    logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
@@ -157,10 +163,17 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # ips = list( map( str, subnet.hosts() ) )
    ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
-   # Shifts the lowest octet 1 left to make room for a /31 pair
-   # 1.1.1.0 => 1.1.1.0/31
-   # 1.1.1.1 => 1.1.1.2/31
-   #def ShiftIP(router_id):
+   # Calculates a /127 to use in fc00::/7 private space, based on node IDs
+   def CalcIPv6LinkIPs():
+      lo_ip = min( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+      hi_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+      private = ipaddress.ip_address( "fc00::" )
+      ip_int = int(private) << 65 + int(hi_ip) << 33 + int(lo_ip) << 1
+      ip = ipaddress.ip_address( ip_int )
+      v6_subnet = ipaddress.ip_network( str(ip) + '/127', strict=False )
+      i6 = list( map( str, v6_subnet.hosts() ) )
+      return ( i6[0], i6[1] ) if local_ip == str(lo_ip) else ( i6[1], i6[0] )
+
    # intip = int(router_id)
    # last_octet = (intip % 256)
    #  ip2 = intip + last_octet # Double last octet, may overflow into next
@@ -173,9 +186,8 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
    # v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    # v6_ips = list( map( str, v6_subnet.hosts() ) )
-   # local_v6 = v6_ips[ 1 if local_ip == str(highest_ip) else 0 ]
-   # peer_v6  = v6_ips[ 0 if local_ip == str(highest_ip) else 1 ]
-   # logging.info( f"ConfigurePeerIPMAC v6_pair={v6_ips} local={local_v6} peer={peer_v6}" )
+   local_v6, peer_v6 = CalcIPv6LinkIPs()
+   logging.info( f"ConfigurePeerIPMAC local[v6]={local_v6} peer[v6]={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
    desc = f"auto-configured by SRL FRR agent peer={peer_ip}"
@@ -199,10 +211,16 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
            ]
         }
      },
-     "ipv6" : { } # Enable ipv6, use auto-assigned link local as nexthop
+     "ipv6" : {
+       "address" : [
+          { "ip-prefix" : local_v6 + "/127",
+            "primary": '[null]'  # type 'empty'
+          }
+       ]
+     }
    }
    gNMI_Set( gnmi_stub, path, config )
-   return ips[1]
+   return ips[1], peer_v6
 
 # Works, but no longer used
 def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
@@ -452,18 +470,18 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v4 = ConfigurePeerIPMAC( _i, localId, peerId, mac, cfg['bgp_link_local_range'], gnmi_stub )
+                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, cfg['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       intf_index = ipdb.interfaces[_i]['index'] # Matches 'oif' in netlink
 
                       # Update NHGs with ipv4/v6 addresses for peer
                       # SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
                       ni[ 'v4' ][ peer_v4 ] = True
-                      ni[ 'v6' ][ neighbor ] = True
+                      ni[ 'v6' ][ peer_v6 ] = True # cannot use 'neighbor'
                       SDK_AddNHG(self.net_inst,"v4",ni[ 'v4' ])
                       SDK_AddNHG(self.net_inst,f"v4_{intf_index}",[peer_v4])
                       SDK_AddNHG(self.net_inst,"v6",ni[ 'v6' ])
-                      SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[neighbor])
+                      SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[peer_v6])
 
                       todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={todo}" )
