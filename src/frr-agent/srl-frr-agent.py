@@ -763,8 +763,8 @@ def Run():
     # TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
 
     # Test: create dummy ECMP route pair
-    SDK_AddNHG( "default", "dummy", [ "192.0.0.1", "192.0.0.3" ] )
-    SDK_AddRoute( "default", "dummy", "66.66.66.66", 32, preference=99 )
+    # SDK_AddNHG( "default", "dummy", [ "192.0.0.1", "192.0.0.3" ] )
+    # SDK_AddRoute( "default", "dummy", "66.66.66.66", 32, preference=99 )
 
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
