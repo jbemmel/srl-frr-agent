@@ -502,7 +502,7 @@ def UpdateBGPInterface(ni,intf,peer_as):
     net_inst = cfg['network_instance']
     if peer_as is not None:
        ni['bgp_interfaces'][ intf ] = peer_as
-       cmd = [ f"neighbor {intf} interface remote-as {peer_as}",
+       cmd = [ f"neighbor {intf} interface v6only remote-as {peer_as}",
                f"neighbor {intf} port {cfg['frr_bgpd_port']}" ]
     else:
        # TODO remove NHG
@@ -608,7 +608,7 @@ def Handle_Notification(obj, state):
                       lines = ""
                       for name,peer_as in ni['bgp_interfaces'].items():
                         # Add single indent space at end
-                        lines += f'neighbor {name} interface remote-as {peer_as}\n '
+                        lines += f'neighbor {name} interface v6only remote-as {peer_as}\n '
                         # Use configured BGP port, custom patch
                         lines += f'neighbor {name} port {params[ "frr_bgpd_port" ]}\n '
 
