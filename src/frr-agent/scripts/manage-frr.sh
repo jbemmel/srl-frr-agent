@@ -121,7 +121,7 @@ router bgp $autonomous_system
  !
 ip prefix-list link_local_v4 seq 5 permit ${bgp_link_local_range} ge 31 le 32
 !
-ipv6 prefix-list link_local_v6 seq 10 permit fc00::/7 ge 127 le 128
+ipv6 prefix-list link_local_v6 seq 10 permit fc00::/16 ge 127 le 128
 !
 route-map drop_link_routes_v4 deny 10
  match ip address prefix-list link_local_v4
