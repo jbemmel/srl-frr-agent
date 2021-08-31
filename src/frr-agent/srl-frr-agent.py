@@ -157,10 +157,19 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # ips = list( map( str, subnet.hosts() ) )
    ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
+   # Shifts the lowest octet 1 left to make room for a /31 pair
+   # 1.1.1.0 => 1.1.1.0/31
+   # 1.1.1.1 => 1.1.1.2/31
+   def ShiftIP(router_id):
+      intip = int(router_id)
+      last_octet = (intip % 256)
+      ip2 = intip + last_octet # Double last octet, may overflow into next
+      return ipaddress.ip_address( ip2 )
+
    # For IPv6, build a /127 based on mapped ipv4 of  2 * highest ID
    # (assuming leaves have higher IDs than spines)
    highest_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
-   ip31 = str( ipaddress.ip_address( 2*int(highest_ip) ) ) # Create room for /31
+   ip31 = str( ShiftIP(highest_ip) ) # Create room for /31
    mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
    v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
