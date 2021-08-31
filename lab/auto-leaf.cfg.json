@@ -3,7 +3,8 @@
     "role": "leaf",
     "use-bgp-unnumbered": true,
     "use-ospfv3": false,
-    "use-evpn": true
+    "use-evpn": true,
+    "auto-lags": false
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
