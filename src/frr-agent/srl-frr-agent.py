@@ -489,7 +489,8 @@ class MonitoringThread(Thread):
           time.sleep(10)
           logging.info( f"MonitoringThread wakes up left={todo}" )
       except Exception as e:
-         logging.error(e)
+         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+         logging.error( f"MonitoringThread error: {e} trace={traceback_str}" )
 
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
