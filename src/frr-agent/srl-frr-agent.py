@@ -216,7 +216,8 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
           { "ip-prefix" : local_v6 + "/127",
             "primary": '[null]'  # type 'empty'
           }
-       ]
+       ],
+       "router-advertisement": { "router-role": { "admin-state": "disable" } }
      }
    }
    gNMI_Set( gnmi_stub, path, config )
