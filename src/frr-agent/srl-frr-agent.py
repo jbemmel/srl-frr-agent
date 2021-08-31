@@ -164,10 +164,9 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
    v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
    v6_ips = list( map( str, v6_subnet.hosts() ) )
-   _i = v6_ips.index( str(ipaddress.ip_address(mapped_v4)) )
-   local_v6 = v6_ips[ _i if local_ip == str(highest_ip) else (1-_i) ]
-   peer_v6  = v6_ips[ (1-_i) if local_ip == str(highest_ip) else _i ]
-   logging.info( f"ConfigurePeerIPMAC v6={v6_ips} local={local_v6} peer={peer_v6}" )
+   local_v6 = v6_ips[ 1 if local_ip == str(highest_ip) else 0 ]
+   peer_v6  = v6_ips[ 0 if local_ip == str(highest_ip) else 1 ]
+   logging.info( f"ConfigurePeerIPMAC v6_pair={v6_ips} local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
    desc = f"auto-configured by SRL FRR agent peer={peer_ip}"
