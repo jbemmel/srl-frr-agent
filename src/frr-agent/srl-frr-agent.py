@@ -160,22 +160,22 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    # Shifts the lowest octet 1 left to make room for a /31 pair
    # 1.1.1.0 => 1.1.1.0/31
    # 1.1.1.1 => 1.1.1.2/31
-   def ShiftIP(router_id):
-      intip = int(router_id)
-      last_octet = (intip % 256)
-      ip2 = intip + last_octet # Double last octet, may overflow into next
-      return ipaddress.ip_address( ip2 )
+   #def ShiftIP(router_id):
+   # intip = int(router_id)
+   # last_octet = (intip % 256)
+   #  ip2 = intip + last_octet # Double last octet, may overflow into next
+   #  return ipaddress.ip_address( ip2 )
 
    # For IPv6, build a /127 based on mapped ipv4 of  2 * highest ID
    # (assuming leaves have higher IDs than spines)
-   highest_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
-   ip31 = str( ShiftIP(highest_ip) ) # Create room for /31
-   mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
-   v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
-   v6_ips = list( map( str, v6_subnet.hosts() ) )
-   local_v6 = v6_ips[ 1 if local_ip == str(highest_ip) else 0 ]
-   peer_v6  = v6_ips[ 0 if local_ip == str(highest_ip) else 1 ]
-   logging.info( f"ConfigurePeerIPMAC v6_pair={v6_ips} local={local_v6} peer={peer_v6}" )
+   # highest_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+   # ip31 = str( ShiftIP(highest_ip) ) # Create room for /31
+   # mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
+   # v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
+   # v6_ips = list( map( str, v6_subnet.hosts() ) )
+   # local_v6 = v6_ips[ 1 if local_ip == str(highest_ip) else 0 ]
+   # peer_v6  = v6_ips[ 0 if local_ip == str(highest_ip) else 1 ]
+   # logging.info( f"ConfigurePeerIPMAC v6_pair={v6_ips} local={local_v6} peer={peer_v6}" )
 
    path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
    desc = f"auto-configured by SRL FRR agent peer={peer_ip}"
@@ -199,17 +199,10 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
            ]
         }
      },
-     "ipv6" : {
-        "address" : [
-           # Use ipv4 mapped address, /127 around highest of router IDs
-           { "ip-prefix" : local_v6 + "/127",
-             "primary": '[null]'  # type 'empty'
-           }
-        ]
-     }
+     "ipv6" : { } # Enable ipv6, use auto-assigned link local as nexthop
    }
    gNMI_Set( gnmi_stub, path, config )
-   return ( ips[1], peer_v6 )
+   return ips[1]
 
 # Works, but no longer used
 def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
@@ -459,18 +452,18 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, cfg['bgp_link_local_range'], gnmi_stub )
+                      peer_v4 = ConfigurePeerIPMAC( _i, localId, peerId, mac, cfg['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       intf_index = ipdb.interfaces[_i]['index'] # Matches 'oif' in netlink
 
                       # Update NHGs with ipv4/v6 addresses for peer
                       # SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
                       ni[ 'v4' ][ peer_v4 ] = True
-                      ni[ 'v6' ][ peer_v6 ] = True
+                      ni[ 'v6' ][ neighbor ] = True
                       SDK_AddNHG(self.net_inst,"v4",ni[ 'v4' ])
                       SDK_AddNHG(self.net_inst,f"v4_{intf_index}",[peer_v4])
                       SDK_AddNHG(self.net_inst,"v6",ni[ 'v6' ])
-                      SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[peer_v6])
+                      SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[neighbor])
 
                       todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={todo}" )
