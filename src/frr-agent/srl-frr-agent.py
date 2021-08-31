@@ -189,6 +189,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
            }
         ],
         "arp" : {
+           "duplicate-address-detection" : False, # Need to disable DAD
            "neighbor": [
              {
                "ipv4-address": ips[ 1 ],

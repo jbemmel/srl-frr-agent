@@ -83,9 +83,9 @@ module srl-frr-agent {
               }
 
               leaf link-local-range {
-                description "IP prefix range to use for link local ipv4 /31 next hop pairs, default 192.168.255.0/24";
+                description "IP prefix range to use for link local ipv4 /31 next hop pairs, default 192.0.0.0/24";
                 type string;
-                default "192.168.255.0/24"; // 192.0.0.0/24 does not work
+                default "192.0.0.0/24"; // DAD disabled
               }
             }
             container eigrp {
