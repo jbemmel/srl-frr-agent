@@ -385,6 +385,11 @@ def Del_Route(network_instance, netlink_msg):
 def RegisterRouteHandler(net_inst,preference,interfaces):
   logging.info( f"RegisterRouteHandler({net_inst},preference={preference})" )
 
+  # During system startup, wait for netns to be created
+  while not os.path.exists( f'/var/run/netns/srbase-{net_inst}' ):
+     logging.info( f"Waiting for srbase-{net_inst} netns to be created...")
+     time.sleep(1)
+
   # Need to do this in a separate thread, not same as processing config
   ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
 
