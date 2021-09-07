@@ -24,41 +24,48 @@ On the peer, the _exact same address_ is used:
 fe80::9f:7fff:feff:1 dev e1-1.0 lladdr 02:9f:7f:ff:00:01 router REACHABLE
 ...
 ```
-SR Linux does not allow configuration of link-local addresses on interfaces, and next hops with such addresses (ipv4/v6) are currently ignored. Therefore, this demo agent instead assigns a pair of /31 IPv4 addresses based on the peer's IPv4 router ID, and assigns that to the interface after the automatic IPv6 BGP peering session is established.
+SR Linux does not allow configuration of link-local addresses on interfaces, and next hops with such addresses (ipv4/v6) are currently ignored. Therefore, this demo agent instead assigns a /31 IPv4 address based on a configured range, and assigns that to the interface after the automatic IPv6 BGP peering session is established.
 Similarly, a mapped IPv4 local /127 peer link is provisioned for IPv6, using the lowest router ID as a base (+1 or -1 for the peer IP).
 
-The IPv4 addresses are asymmetrical, as they are only used to lookup the MAC address of the next hop:
+The IPv4 addresses are asymmetrical, as they are only used to lookup the MAC address of the next hop. It may happen that the same address is used on both sides of the link:
 ```
-spine e1-1.0: 1.1.1.0/31 -> leaf  = 1.1.1.1 (router ID)
-leaf  e1-1.0: 1.1.0.0/31 -> spine = 1.1.0.1 (router ID)
+spine e1-1.0: 192.0.0.0/31 -> leaf ARP entry for 192.0.0.1
+leaf  e1-1.0: 192.0.0.0/31 -> spine ARP entry for 192.0.0.1
 ```
 
 These addresses are automatically managed by the agent:
 ```
-A:spine1# /interface ethernet-1/1                                                                                                                                                                                  
---{ + running }--[ interface ethernet-1/1 ]--                                                                                                                                                                      
-A:spine1# info                                                                                                                                                                                                     
-    admin-state enable
-    subinterface 0 {
+A:spine1# info /interface ethernet-1/1                                                                                                                                                                             
+    interface ethernet-1/1 {
         admin-state enable
-        ipv4 {
-            address 1.1.1.0/31 {
-                primary
+        subinterface 0 {
+            description "auto-configured by SRL FRR agent peer=1.1.1.1"
+            admin-state enable
+            ipv4 {
+                address 192.0.0.0/31 {
+                    primary
+                }
+                arp {
+                    duplicate-address-detection false
+                    neighbor 192.0.0.1 {
+                        link-layer-address 02:CF:5B:FF:00:01 !!! auto-configured by SRL FRR agent peer=1.1.1.1
+                    }
+                }
             }
-            arp {
-                neighbor 1.1.1.1 {
-                    link-layer-address 02:2D:12:FF:00:01 !!! managed by SRL FRR agent
+            ipv6 {
+                address fc00:101:101:101:1::/127 {
+                    primary
+                }
+                router-advertisement {
+                    router-role {
+                        admin-state disable
+                    }
                 }
             }
         }
-        ipv6 {
-            address ::ffff:1.1.0.1/127 {
-                primary
-            }
-        }
     }
---{ + running }--[ interface ethernet-1/1 ]--
 ```
+Note how duplicate address detection needs to be disabled, in case the same address is used on both sides. Also note how SR Linux IPv6 RA are disabled (as FRR is sending these as well, and they may conflict)
 
 ## Populating the data path: adding routes using the SR Linux NDK
 
