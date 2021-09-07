@@ -149,42 +149,41 @@ show ip route
 ```
 Which should look something like this:
 ```
-leaf1# show bgp sum
+spine1# show bgp sum
 
 IPv4 Unicast Summary:
-BGP router identifier 1.1.1.1, local AS number 65001 vrf-id 0
-BGP table version 4
-RIB entries 7, using 1288 bytes of memory
-Peers 1, using 727 KiB of memory
+BGP router identifier 1.1.0.1, local AS number 65000 vrf-id 0
+BGP table version 2
+RIB entries 3, using 552 bytes of memory
+Peers 1, using 723 KiB of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-spine1(e1-1.0)  4      65000        75        75        0    0    0 00:03:22            2        4 N/A
+leaf1(e1-1.0)   4      65001       581       581        0    0    0 00:28:42            1        2 N/A
 
 Total number of neighbors 1
 
 IPv6 Unicast Summary:
-BGP router identifier 1.1.1.1, local AS number 65001 vrf-id 0
-BGP table version 0
-RIB entries 0, using 0 bytes of memory
-Peers 1, using 727 KiB of memory
+BGP router identifier 1.1.0.1, local AS number 65000 vrf-id 0
+BGP table version 2
+RIB entries 3, using 552 bytes of memory
+Peers 1, using 723 KiB of memory
 
 Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
-spine1(e1-1.0)  4      65000        75        75        0    0    0 00:03:22            0        0 N/A
+leaf1(e1-1.0)   4      65001       581       581        0    0    0 00:28:42            1        2 N/A
 
 Total number of neighbors 1
 
-leaf1# show ip route
+spine1# show ip route
 Codes: K - kernel route, C - connected, S - static, R - RIP,
        O - OSPF, I - IS-IS, B - BGP, E - EIGRP, N - NHRP,
        T - Table, A - Babel, F - PBR, f - OpenFabric,
        > - selected route, * - FIB route, q - queued, r - rejected, b - backup
        t - trapped, o - offload failure
 
-C>* 1.1.0.0/31 is directly connected, e1-1.0, 00:05:41
-B>* 1.1.1.0/31 [20/0] via fe80::a5:2cff:feff:1, e1-1.0, weight 1, 00:05:41
-B>* 100.1.0.1/32 [20/0] via fe80::a5:2cff:feff:1, e1-1.0, weight 1, 00:05:52
-C>* 100.1.1.1/32 is directly connected, lo0.0, 00:05:57
-C>* 169.254.1.0/24 is directly connected, gateway, 00:05:57
+C>* 100.1.0.1/32 is directly connected, lo0.0, 00:27:50
+B>* 100.1.1.1/32 [20/0] via fe80::cf:5bff:feff:1, e1-1.0, weight 1, 00:27:44
+C>* 169.254.1.0/24 is directly connected, gateway, 00:27:50
+C>* 192.0.0.0/31 is directly connected, e1-1.0, 00:27:38
 ```
 
 On SR Linux side, the routes get instantiated:
