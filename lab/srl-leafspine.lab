@@ -11,8 +11,8 @@ topology:
 
   nodes:
     leaf1:  { kind: srl, group: leaves, startup-config: leaf1-frr.cfg.json }
-    # spine1: { kind: srl, group: spines, startup-config: spine1-frr.cfg.json }
-    spine1: { kind: srl, group: spines, startup-config: spine1.cfg.json }
+    spine1: { kind: srl, group: spines, startup-config: spine1-frr.cfg.json }
+    # spine1: { kind: srl, group: spines, startup-config: spine1.cfg.json }
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
