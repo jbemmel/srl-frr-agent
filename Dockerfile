@@ -34,7 +34,7 @@ RUN sudo mkdir -p /home/admin && printf '%s\n' \
   \
 >> /home/admin/.srlinuxrc
 
-RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/frr-agent
+RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/frr-agent
 COPY --chown=srlinux:srlinux ./srl-frr-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/demo-agents/
 
