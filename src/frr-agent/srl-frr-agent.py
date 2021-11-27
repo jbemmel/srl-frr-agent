@@ -243,6 +243,21 @@ def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
     }
     return gNMI_Set( gnmi_stub, path, config )
 
+def EnableIPv4OverIPv6( net_inst, gnmi_stub ):
+    """
+    See https://infocenter.nokia.com/public/SRLINUX216R1A/index.jsp?topic=%2Fcom.srlinux.configbasics%2Fhtml%2Fconfigb-interfaces.html
+    """
+    logging.info( f"EnableIPv4OverIPv6: {net_inst}" )
+    path = f'/network-instance[name={net_inst}]'
+    config = {
+      'ip-forwarding': { 'receive-ipv4-check': False },
+      'protocols': { 'bgp': { 'ipv4-unicast': {
+        'advertise-ipv6-next-hops': True,
+        'receive-ipv6-next-hops': True }
+      }}
+    }
+    return gNMI_Set( gnmi_stub, path, config )
+
 def gNMI_Set( gnmi_stub, path, data ):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
    #                       username="admin",password="admin",
@@ -456,6 +471,9 @@ class MonitoringThread(Thread):
 
       # Create per-thread gNMI stub, using a global channel
       gnmi_stub = gNMIStub( gnmi_channel )
+
+      # NEW: Enable IPv4 over IPv6, TODO change route next hop logic accordingly
+      EnableIPv4OverIPv6( self.net_inst, gnmi_stub )
 
       try:
         todo = list( self.interfaces.keys() )
