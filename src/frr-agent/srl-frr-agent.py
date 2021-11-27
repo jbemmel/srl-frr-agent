@@ -712,7 +712,7 @@ def Handle_Notification(obj, state):
             elif peer_as is not None:
                 mapping = { intf : peer_as }
                 if 'bgp_interfaces' in ni:
-                    ni['bgp_interfaces'].update( mapping )
+                  ni['bgp_interfaces'].update( mapping )
                 elif ni=={}:
                   state.network_instances[ net_inst ] = {
                     "bgp_interfaces" : mapping

@@ -91,19 +91,11 @@ fi
 if [[ "$bgp" == "enable" ]]; then
 
 if [[ "$bgp_link_local_range" != "ipv6" ]]; then
-IPV4_PREFIXLIST="ip prefix-list link_local_v4 seq 5 permit ${bgp_link_local_range} ge 31 le 32"
-IFS='' read -r -d '' IPV4_AF << EOF
- address-family ipv4 unicast
-  redistribute connected route-map drop_link_routes_v4
- exit-address-family
-EOF
-
-IFS='' read -r -d '' IPV4_ROUTEMAP << EOF
+IFS='' read -r -d '' IPV4_ROUTEMAP_PREFIX_DENY << EOF
+ip prefix-list link_local_v4 seq 5 permit ${bgp_link_local_range} ge 31 le 32
+!
 route-map drop_link_routes_v4 deny 10
  match ip address prefix-list link_local_v4
-!
-route-map drop_link_routes_v4 permit 20
-!
 EOF
 fi
 
@@ -129,17 +121,20 @@ router bgp $autonomous_system
  ${bgp_neighbor_lines}
 
  !
-\${IPV4_AF}
+ address-family ipv4 unicast
+  redistribute connected route-map drop_link_routes_v4
+ exit-address-family
  !
  address-family ipv6 unicast
   redistribute connected route-map drop_link_routes_v6
  exit-address-family
  !
-\${IPV4_PREFIXLIST}
+!
+\${IPV4_ROUTEMAP_PREFIX_DENY}
+!
+route-map drop_link_routes_v4 permit 20
 !
 ipv6 prefix-list link_local_v6 seq 5 permit fd00::/16 ge 127 le 128
-!
-\${IPV4_ROUTEMAP}
 !
 route-map drop_link_routes_v6 deny 10
  match ipv6 address prefix-list link_local_v6
