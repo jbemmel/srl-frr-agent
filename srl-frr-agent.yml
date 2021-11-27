@@ -4,7 +4,7 @@ srl_frr_agent:
    launch-command: sudo /opt/demo-agents/frr-agent/scripts/srl-frr-agent.sh
    search-command: python3 /opt/demo-agents/frr-agent/srl-frr-agent.py
    wait-for-config: Yes
-   failure-threshold: 100
+   failure-threshold: 3
    failure-action: wait=forever
    author: 'Nokia'
    version-command: ' cat build_version'
