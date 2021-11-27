@@ -150,7 +150,7 @@ def GetLinkLocalIPs( phys_intf, link_local_range ):
 # IPv4: for local resolution to the nexthop MAC
 # IPv6: SRL does not support using link local IPv6 address as next hop
 #
-def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stub ):
+def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, link_local_range, gnmi_stub ):
    logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip} range={link_local_range}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
@@ -168,7 +168,9 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
       lo = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(lo_ip).split('.')))
       hi = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(hi_ip).split('.')))
       # Local private ipv6 address based on RFC4193, generated from both router IDs
-      private_v6 = ipaddress.ip_address( f"fd00:{hi}:{lo}::" )
+      # Use 2 * last octet of smaller router ID as unique link distinguisher
+      link_octet = int( (local_v6 if local_ip == str(lo_ip) else mac).split(':')[-1], 16 )
+      private_v6 = ipaddress.ip_address( f"fd00:{hi}:{lo}::{(2*link_octet):x}" )
       logging.info( f"ConfigurePeerIPMAC selecting private RFC4193 IPv6: {private_v6}" )
       v6_subnet = ipaddress.ip_network( str(private_v6) + '/127', strict=False )
       i6 = list( map( str, v6_subnet.hosts() ) )
@@ -503,12 +505,14 @@ class MonitoringThread(Thread):
                    localId = i['localRouterId']
                    peerId = i['remoteRouterId']
                    if neighbor!="none" and peerId!="0.0.0.0":
+                      logging.info( f"Data from FRR:\n{i}" )
+                      localV6 = i['hostLocal']
                       # dont have the MAC address, but can derive it from ipv6 link local
                       mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, cfg['bgp_link_local_range'], gnmi_stub )
+                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, cfg['bgp_link_local_range'], gnmi_stub )
                       # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
                       intf_index = ipdb.interfaces[_i]['index'] # Matches 'oif' in netlink
 
