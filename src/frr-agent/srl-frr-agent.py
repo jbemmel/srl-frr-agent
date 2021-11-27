@@ -156,8 +156,6 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, link_local_range
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
 
    # Tried using /31 around router ID, but interferes with loopback peering
-   # subnet = ipaddress.ip_network(peer_ip+'/31',strict=False)
-   # ips = list( map( str, subnet.hosts() ) )
    ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
    # Calculates a /127 to use in fc00::/7 private space, based on node IDs
@@ -169,6 +167,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, link_local_range
       hi = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(hi_ip).split('.')))
       # Local private ipv6 address based on RFC4193, generated from both router IDs
       # Use 2 * last octet of smaller router ID as unique link distinguisher
+      # On cSRL MACs start with :01 on e1-1, but this may not be universal -> no -1
       link_octet = int( (local_v6 if local_ip == str(lo_ip) else mac).split(':')[-1], 16 )
       private_v6 = ipaddress.ip_address( f"fd00:{hi}:{lo}::{(2*link_octet):x}" )
       logging.info( f"ConfigurePeerIPMAC selecting private RFC4193 IPv6: {private_v6}" )
