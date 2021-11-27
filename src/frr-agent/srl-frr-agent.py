@@ -220,7 +220,7 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
        "router-advertisement": { "router-role": { "admin-state": "disable" } }
      }
    }
-   gNMI_Set( gnmi_stub, path, config )
+   gNMI_Set( gnmi_stub, updates=[(path, config)] )
    return ips[1], peer_v6
 
 # Works, but no longer used
@@ -241,38 +241,40 @@ def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
       }
      ]
     }
-    return gNMI_Set( gnmi_stub, path, config )
+    return gNMI_Set( gnmi_stub, updates=[(path, config)] )
 
 def EnableIPv4OverIPv6( net_inst, gnmi_stub ):
     """
     See https://infocenter.nokia.com/public/SRLINUX216R1A/index.jsp?topic=%2Fcom.srlinux.configbasics%2Fhtml%2Fconfigb-interfaces.html
+
+    Enable multipath ECMP too
     """
     logging.info( f"EnableIPv4OverIPv6: {net_inst}" )
-    path = f'/network-instance[name={net_inst}]'
-    config = {
-      'ip-forwarding': { 'receive-ipv4-check': False },
-      'protocols': { 'bgp': { 'ipv4-unicast': {
-        'advertise-ipv6-next-hops': True,
-        'receive-ipv6-next-hops': True }
-      }}
-    }
-    return gNMI_Set( gnmi_stub, path, config )
+    base = f'/network-instance[name={net_inst}]/'
+    updates = [
+     (base+'ip-forwarding', { 'receive-ipv4-check': False } ),
+     (base+'protocols/bgp/ipv4-unicast', {
+      'advertise-ipv6-next-hops': True, 'receive-ipv6-next-hops': True,
+      'multipath': { 'max-paths-level-1': 16, 'max-paths-level-2': 16 }
+     }) ]
+    return gNMI_Set( gnmi_stub, updates )
 
-def gNMI_Set( gnmi_stub, path, data ):
+def gNMI_Set( gnmi_stub, updates ):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
    #                       username="admin",password="admin",
    #                       insecure=True, debug=True) as gnmic:
    #  logging.info( f"Sending gNMI SET: {path} {config} {gnmic}" )
    update_msg = []
-   u_path = gnmi_path_generator( path )
-   u_val = bytes( json.dumps(data), 'utf-8' )
-   update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
+   for path,data in updates:
+     u_path = gnmi_path_generator( path )
+     u_val = bytes( json.dumps(data), 'utf-8' )
+     update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
    update_request = SetRequest( update=update_msg )
    try:
          # Leaving out 'metadata' does return an error, so the call goes through
          # It just doesn't show up in CLI (cached), logout+login fixes it
          res = gnmi_stub.Set( update_request, metadata=gnmi_options )
-         logging.info( f"After gnmi.Set {path}: {res}" )
+         logging.info( f"After gnmi.Set {updates}: {res}" )
          return res
    except grpc._channel._InactiveRpcError as err:
          logging.error(err)
@@ -473,7 +475,8 @@ class MonitoringThread(Thread):
       gnmi_stub = gNMIStub( gnmi_channel )
 
       # NEW: Enable IPv4 over IPv6, TODO change route next hop logic accordingly
-      EnableIPv4OverIPv6( self.net_inst, gnmi_stub )
+      # Requires native BGP to be provisioned too, not currently done
+      # EnableIPv4OverIPv6( self.net_inst, gnmi_stub )
 
       try:
         todo = list( self.interfaces.keys() )
