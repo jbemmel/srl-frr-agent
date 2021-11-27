@@ -1166,7 +1166,7 @@
       ]
     },
     {
-      "name": "lo0",
+      "name": "system0",
       "admin-state": "enable",
       "subinterface": [
         {
@@ -1423,7 +1423,7 @@
           "srl-frr-agent:bgp-unnumbered-peer-as": "external"
         },
         {
-          "name": "lo0.0"
+          "name": "system0.0"
         }
       ],
       "protocols": {
