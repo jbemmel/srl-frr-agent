@@ -1,10 +1,10 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "role": "leaf",
-    "use-bgp-unnumbered": true,
-    "use-ospfv3": false,
-    "use-evpn": true,
-    "auto-lags": false
+    "igp": "bgp-unnumbered",
+    "evpn": {
+      "model": "symmetric-irb",
+      "auto-lags": "disabled"
+    }
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {

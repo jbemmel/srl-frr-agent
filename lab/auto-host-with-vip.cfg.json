@@ -1,6 +1,10 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "role": "endpoint"
+    "igp": "bgp-unnumbered",
+    "evpn": {
+      "model": "symmetric-irb",
+      "auto-lags": "disabled"
+    }
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
