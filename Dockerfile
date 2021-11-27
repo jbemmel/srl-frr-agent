@@ -30,7 +30,7 @@ RUN sudo yum install -y /tmp/frr8.rpm \
 
 # Define custom alias for accessing vtysh in some namespace
 RUN sudo mkdir -p /home/admin && printf '%s\n' \
-  '"vtysh network-instance" = "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-{}/"' \
+  '"vtysh {network-instance}" = "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-{}/"' \
   \
 >> /home/admin/.srlinuxrc
 

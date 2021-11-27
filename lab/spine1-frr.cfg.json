@@ -1469,7 +1469,8 @@
           "admin-state": "enable",
           "autonomous-system": 65000,
           "router-id": "1.1.0.1",
-	  "bgp": {
+          "link-local-range": "ipv6",
+          "bgp": {
             "admin-state": "enable"
           }
         }
