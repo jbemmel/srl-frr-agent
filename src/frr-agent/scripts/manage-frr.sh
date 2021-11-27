@@ -89,6 +89,24 @@ EIGRP_CONFIG="no router eigrp $autonomous_system"
 fi
 
 if [[ "$bgp" == "enable" ]]; then
+
+if [[ "$bgp_link_local_range" != "ipv6" ]]; then
+IPV4_PREFIXLIST="ip prefix-list link_local_v4 seq 5 permit ${bgp_link_local_range} ge 31 le 32"
+IFS='' read -r -d '' IPV4_AF << EOF
+ address-family ipv4 unicast
+  redistribute connected route-map drop_link_routes_v4
+ exit-address-family
+EOF
+
+IFS='' read -r -d '' IPV4_ROUTEMAP << EOF
+route-map drop_link_routes_v4 deny 10
+ match ip address prefix-list link_local_v4
+!
+route-map drop_link_routes_v4 permit 20
+!
+EOF
+fi
+
 IFS='' read -r -d '' BGP_CONFIG << EOF
 router bgp $autonomous_system
  bgp router-id $router_id
@@ -107,26 +125,21 @@ router bgp $autonomous_system
 
  ! Blob of configured interfaces for this network-instance, provided by Python
  ! Each line looks like this:
- ! neighbor e1-1.0 interface remote-as [peer-as]
+ ! neighbor e1-[n].0 interface remote-as [peer-as]
  ${bgp_neighbor_lines}
 
  !
- address-family ipv4 unicast
-  redistribute connected route-map drop_link_routes_v4
- exit-address-family
+\${IPV4_AF}
  !
  address-family ipv6 unicast
   redistribute connected route-map drop_link_routes_v6
  exit-address-family
  !
-ip prefix-list link_local_v4 seq 5 permit ${bgp_link_local_range} ge 31 le 32
+\${IPV4_PREFIXLIST}
 !
-ipv6 prefix-list link_local_v6 seq 5 permit fc00::/16 ge 127 le 128
+ipv6 prefix-list link_local_v6 seq 5 permit fd00::/16 ge 127 le 128
 !
-route-map drop_link_routes_v4 deny 10
- match ip address prefix-list link_local_v4
-!
-route-map drop_link_routes_v4 permit 20
+\${IPV4_ROUTEMAP}
 !
 route-map drop_link_routes_v6 deny 10
  match ipv6 address prefix-list link_local_v6

@@ -211,9 +211,9 @@ module srl-frr-agent {
             error-message "BGP unnumbered cannot be configured for this type of interface";
           }
           // For auto-discovery to work, both must be enabled
-          must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv4" {
-            error-message "BGP unnumbered interfaces must have ipv4 enabled";
-          }
+          //must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv4" {
+          //  error-message "BGP unnumbered interfaces must have ipv4 enabled";
+          //}
           must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv6" {
             error-message "BGP unnumbered interfaces must have ipv6 enabled";
           }

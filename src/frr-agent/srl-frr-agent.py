@@ -161,12 +161,15 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, link_local_range, gnmi_stu
    ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
    # Calculates a /127 to use in fc00::/7 private space, based on node IDs
+   # See RFC4193 https://datatracker.ietf.org/doc/html/rfc4193
    def CalcIPv6LinkIPs():
       lo_ip = min( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
       hi_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
       lo = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(lo_ip).split('.')))
       hi = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(hi_ip).split('.')))
-      private_v6 = ipaddress.ip_address( f"fc00:{hi}:{lo}::" )
+      # Local private ipv6 address based on RFC4193, generated from both router IDs
+      private_v6 = ipaddress.ip_address( f"fd00:{hi}:{lo}::" )
+      logging.info( f"ConfigurePeerIPMAC selecting private RFC4193 IPv6: {private_v6}" )
       v6_subnet = ipaddress.ip_network( str(private_v6) + '/127', strict=False )
       i6 = list( map( str, v6_subnet.hosts() ) )
       return ( i6[0], i6[1] ) if local_ip == str(lo_ip) else ( i6[1], i6[0] )
@@ -461,16 +464,18 @@ class MonitoringThread(Thread):
 
       ni = self.state.network_instances[ self.net_inst ]
       cfg = ni['config']
+      use_v4 = cfg['bgp_link_local_range']!='ipv6'
       if self.net_inst in self.state.ipdbs:
-         ipdb = self.state.ipdbs[ self.net_inst ]
+         ipdb, _ = self.state.ipdbs[ self.net_inst ]
       else:
-         ni['v4'] = {} # Start list of IPv4 nexthops
+         if use_v4:
+            ni['v4'] = {} # Start list of IPv4 nexthops
          ni['v6'] = {}
          ipdb = RegisterRouteHandler( self.net_inst,
                                       int(cfg['bgp_preference']),
                                       self.interfaces,
-                                      use_v4=cfg['bgp_link_local_range']!='ipv6' )
-         self.state.ipdbs[ self.net_inst ] = ipdb
+                                      use_v4=use_v4 )
+         self.state.ipdbs[ self.net_inst ] = (ipdb, use_v4)
 
       # (re)start or stop FRR daemons
       if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
@@ -695,18 +700,25 @@ def Handle_Notification(obj, state):
             # Make sure NHGs exists, update with IPs later
             if peer_as is not None and net_inst in state.ipdbs:
               logging.info( f"Pre-creating NHG for {intf}" )
-              ipdb_interfaces = state.ipdbs[net_inst].interfaces
-              intf_index = ipdb_interfaces[intf]['index']
-              SDK_AddNHG(net_inst,f"v4_{intf_index}")
+              ipdb, use_v4 = state.ipdbs[net_inst]
+              intf_index = ipdb.interfaces[intf]['index']
+              if use_v4:
+                 SDK_AddNHG(net_inst,f"v4_{intf_index}")
               SDK_AddNHG(net_inst,f"v6_{intf_index}")
 
             # lookup AS for this ns, check if enabled (i.e. daemon running)
             if 'config' in ni and 'frr' in ni and ni['frr'] == "running":
                 UpdateBGPInterface(ni,intf,peer_as)
             elif peer_as is not None:
-                state.network_instances[ net_inst ] = {
-                  "bgp_interfaces" : { intf : peer_as }
-                }
+                mapping = { intf : peer_as }
+                if 'bgp_interfaces' in ni:
+                    ni['bgp_interfaces'].update( mapping )
+                elif ni=={}:
+                  state.network_instances[ net_inst ] = {
+                    "bgp_interfaces" : mapping
+                  }
+                else:
+                  ni['bgp_interfaces'] = mapping
 
         elif obj.config.key.js_path == ".network_instance.interface.openfabric":
             logging.info("Process openfabric interface config")
@@ -842,7 +854,7 @@ def Run():
                         modified[ netns ] = True
 
     except grpc._channel._Rendezvous as err:
-        logging.info(f'_Rendezvous error: {err}')
+        logging.error(f'_Rendezvous error: {err}')
 
     except Exception as e:
         logging.error(f'Exception caught :: {e}')
@@ -861,10 +873,10 @@ def Exit_Gracefully(signum, frame):
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
         logging.error('try: Unregister response:: {}'.format(response))
-        sys.exit()
     except grpc._channel._Rendezvous as err:
-        logging.info('GOING TO EXIT NOW: {}'.format(err))
-        sys.exit()
+        logging.error('GOING TO EXIT NOW: {}'.format(err))
+    finally:
+        sys.exit(signum)
 
 ##################################################################################################
 ## Main from where the Agent starts
