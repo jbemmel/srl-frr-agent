@@ -266,7 +266,7 @@ class MonitoringThread(Thread):
       cfg = ni['config']
 
       # Create Prefix manager, this starts listening to netlink route events
-      from prefix-mgr import PrefixManager
+      from .prefix_mgr import PrefixManager
       self.prefix_mgr = PrefixManager( self.net_inst, gnmi_channel, metadata,
                                        int(cfg['bgp_preference']) )
 

@@ -1,19 +1,20 @@
 import logging
+import ipaddress
 
 from sdk_protos import route_service_pb2,route_service_pb2_grpc
-from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2,
-                       nexthop_group_service_pb2_grpc as ndk_nhg_grpc
+from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2
+from sdk_protos import nexthop_group_service_pb2_grpc as ndk_nhg_grpc
 
 NHG_ALL = "all_bgp_unnumbered"
 
-class PrefixManager(Object):
-"""
-Manages route prefixes received through netlink, and forwards them to the NDK.
+class PrefixManager:
+    """
+    Manages route prefixes received through netlink, and forwards them to the NDK.
 
-In 21.6.4 (at least) the NDK does not like NHGs without IP next hops provisioned,
-so this class holds on to those prefixes until the nexthop is resolved
-(by FRR BGP unnumbered session coming online)
-"""
+    In 21.6.4 (at least) the NDK does not like NHGs without IP next hops provisioned,
+    so this class holds on to those prefixes until the nexthop is resolved
+    (by FRR BGP unnumbered session coming online)
+    """
     def __init__(self,net_inst,gnmi_channel,metadata,pref):
         self.network_instance = net_inst
         self.channel = gnmi_channel
@@ -134,8 +135,8 @@ so this class holds on to those prefixes until the nexthop is resolved
         route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(self.channel)
         route_response = route_stub.RouteAddOrUpdate(request=route_request,
                                                      metadata=self.metadata)
-        logging.info(f"RouteAddOrUpdate RESPONSE:: {route_response.status}
-                                                   {route_response.error_str}" )
+        logging.info(f"RouteAddOrUpdate RESPONSE:: {route_response.status} " +
+                                                 f"{route_response.error_str}" )
         return route_response.status == 0
 
     def del_Route( self, netlink_msg ):
@@ -158,9 +159,9 @@ so this class holds on to those prefixes until the nexthop is resolved
         route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(self.channel)
         route_del_response = route_stub.RouteDelete(request=route_del_request,
                                                     metadata=self.metadata)
-        logging.info(f"RouteDelete RESPONSE:: {route_del_response.status}
-                                              {route_del_response.error_str}")
-        return route_response.status == 0
+        logging.info(f"RouteDelete RESPONSE:: {route_del_response.status} " +
+                                              f"{route_del_response.error_str}")
+        return route_del_response.status == 0
         # TODO after last route is removed, cleanup NHG too
 
     def onInterfaceBGPv6Connected(self,interface,peer_ipv6):
@@ -195,14 +196,14 @@ so this class holds on to those prefixes until the nexthop is resolved
         assert( interface in self.interface_2_peer_ipv6s )
         for ipv6_nexthop in self.interface_2_peer_ipv6s[interface].keys():
           nh = nhg_info.data.next_hop.add()
-          nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT
-          nh.type = nexthop_group_service_pb2.NextHop.REGULAR
+          nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT
+          nh.type = ndk_nhg_pb2.NextHop.REGULAR
           nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
 
         logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
         nhg_stub = ndk_nhg_grpc.SdkMgrNextHopGroupServiceStub(self.channel)
         nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,
                                                         metadata=self.metadata)
-        logging.info(f"NextHopGroupAddOrUpdate :: status={nhg_response.status}
-                                                  err={nhg_response.error_str}")
+        logging.info(f"NextHopGroupAddOrUpdate :: status={nhg_response.status}"+
+                                                f"err={nhg_response.error_str}")
         return nhg_response.status == 0
