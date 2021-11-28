@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+# Older version with some code no longer used
+
 import grpc
 import datetime
 import time
@@ -15,6 +17,8 @@ import subprocess
 
 # sys.path.append('/usr/lib/python3.6/site-packages/sdk_protos')
 from sdk_protos import sdk_service_pb2, sdk_service_pb2_grpc,config_service_pb2
+from sdk_protos import route_service_pb2,route_service_pb2_grpc
+from sdk_protos import nexthop_group_service_pb2,nexthop_group_service_pb2_grpc
 
 # import sdk_common_pb2
 
@@ -28,6 +32,10 @@ from pygnmi.client import gNMIclient
 from pygnmi.spec.gnmi_pb2_grpc import gNMIStub
 from pygnmi.spec.gnmi_pb2 import SetRequest, Update, TypedValue
 from pygnmi.path_generator import gnmi_path_generator
+
+# Needs yum install python3-pyroute2 -y
+from pyroute2 import IPDB
+from pyroute2 import NetNS
 
 from logging.handlers import RotatingFileHandler
 
@@ -64,6 +72,9 @@ def Subscribe(stream_id, option):
         entry = config_service_pb2.ConfigSubscriptionRequest()
         # entry.key.js_path = '.' + agent_name
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, config=entry)
+    elif option == 'nexthop_group':
+        entry = nexthop_group_service_pb2.NextHopGroupSubscriptionRequest()
+        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, nhg=entry)
 
     subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
     print('Status of subscription response for {}:: {}'.format(option, subscription_response.status))
@@ -122,15 +133,28 @@ def ipv6_2_mac(ipv6):
     return ":".join(macParts)
 
 #
-# Statically configures an IPv6 address on the given interface
+# Calculate pair of /31 IPs for given interface (e.g. e1-1 => peerlinks[0])
 #
-# IPv4: for local resolution to the nexthop MAC, now removed
+def GetLinkLocalIPs( phys_intf, link_local_range ):
+    if link_local_range=="ipv6":
+        return []
+    peerlinks = list(ipaddress.ip_network(link_local_range).subnets(new_prefix=31))
+    peer_link = peerlinks[ int(phys_intf.split('-')[1]) - 1 ]
+    return list( map( str, peer_link.hosts() ) )
+
+#
+# Statically configures both an IPv4 and an IPv6 address on the given interface
+#
+# IPv4: for local resolution to the nexthop MAC
 # IPv6: SRL does not support using link local IPv6 address as next hop
 #
-def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, gnmi_stub ):
-   logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
+def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, link_local_range, gnmi_stub ):
+   logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip} range={link_local_range}" )
    phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
    base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
+
+   # Tried using /31 around router ID, but interferes with loopback peering
+   ips = GetLinkLocalIPs( phys_sub[0], link_local_range )
 
    # Calculates a /127 to use in fc00::/7 private space, based on node IDs
    # See RFC4193 https://datatracker.ietf.org/doc/html/rfc4193
@@ -179,13 +203,67 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, gnmi_stub ):
        "router-advertisement": { "router-role": { "admin-state": "disable" } }
      }
    }
-   updates=[ (path, config),
-             # XXX hardcoded default network instance
-             ('/network-instance[name=default]/ip-forwarding',
-              { 'receive-ipv4-check': False } ) ]
-
+   updates=[(path, config)]
+   if link_local_range=="ipv6":
+       # XXX assumes default network instance
+       updates += [('/network-instance[name=default]/ip-forwarding', { 'receive-ipv4-check': False } )]
+   else:
+       config['ipv4'] = {
+          "address" : [
+             { "ip-prefix" : ips[ 0 ] + "/31",
+               "primary": '[null]'  # type 'empty'
+             }
+          ],
+          "arp" : {
+             "duplicate-address-detection" : False, # Need to disable DAD
+             "neighbor": [
+               {
+                 "ipv4-address": ips[ 1 ],
+                 "link-layer-address": mac, # Because dynamic ARP wont work
+                 "_annotate_link-layer-address": desc
+               }
+             ]
+          }
+      }
    gNMI_Set( gnmi_stub, updates=updates )
-   return peer_v6
+   return ips[1] if len(ips)==2 else None, peer_v6
+
+# Works, but no longer used
+def ConfigureNextHopGroup( net_inst, intf, peer_ip, gnmi_stub ):
+    path = f'/network-instance[name={net_inst}]/next-hop-groups'
+    config = {
+     "group": [
+      {
+        "name": intf, # Full interface.sub
+        "nexthop": [
+          {
+            "index": 0,
+            "ip-address": peer_ip,
+            "_annotate_ip-address" : "managed by SRL FRR agent",
+            "admin-state": "enable"
+          }
+        ]
+      }
+     ]
+    }
+    return gNMI_Set( gnmi_stub, updates=[(path, config)] )
+
+# Not currently used
+def EnableIPv4OverIPv6( net_inst, gnmi_stub ):
+    """
+    See https://infocenter.nokia.com/public/SRLINUX216R1A/index.jsp?topic=%2Fcom.srlinux.configbasics%2Fhtml%2Fconfigb-interfaces.html
+
+    Enable multipath ECMP too
+    """
+    logging.info( f"EnableIPv4OverIPv6: {net_inst}" )
+    base = f'/network-instance[name={net_inst}]/'
+    updates = [
+     (base+'ip-forwarding', { 'receive-ipv4-check': False } ),
+     (base+'protocols/bgp/ipv4-unicast', {
+      'advertise-ipv6-next-hops': True, 'receive-ipv6-next-hops': True,
+      'multipath': { 'max-paths-level-1': 16, 'max-paths-level-2': 16 }
+     }) ]
+    return gNMI_Set( gnmi_stub, updates )
 
 def gNMI_Set( gnmi_stub, updates ):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
@@ -214,6 +292,162 @@ def gNMI_Set( gnmi_stub, updates ):
              logging.info(f"OK, success? {res}")
              return res
          raise err
+
+#
+# Creates a next hop group using the SDK
+# @param ip_nexthops: Optional list of next hop IPs (should be same version)
+#
+# XXX this leads to crashes when a route is subsequently created to such an empty NHG
+#
+def SDK_AddNHG( network_instance, name, ip_nexthops=[] ):
+    logging.info(f"SDK_AddNHG :: name={name} ip_nexthops={ip_nexthops}")
+    nhg_stub = nexthop_group_service_pb2_grpc.SdkMgrNextHopGroupServiceStub(channel)
+    nh_request = nexthop_group_service_pb2.NextHopGroupRequest()
+
+    # IPv4
+    nhg_info = nh_request.group_info.add()
+    nhg_info.key.network_instance_name = network_instance
+    nhg_info.key.name = name + '_sdk' # Must end with '_sdk'
+
+    for ip in ip_nexthops:
+      nh = nhg_info.data.next_hop.add()
+      nh.resolve_to = nexthop_group_service_pb2.NextHop.INDIRECT  # DIRECT? LOCAL?
+      nh.type = nexthop_group_service_pb2.NextHop.REGULAR
+      nh.ip_nexthop.addr = ipaddress.ip_address(ip).packed
+
+    logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
+    nhg_response = nhg_stub.NextHopGroupAddOrUpdate(request=nh_request,metadata=metadata)
+    logging.info(f"NextHopGroupAddOrUpdate :: status={nhg_response.status} err={nhg_response.error_str}")
+    return nhg_response.status != 0
+
+def SDK_AddRoute(network_instance,nhg_name,ip_addr,prefix_len,preference):
+    route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
+    route_request = route_service_pb2.RouteAddRequest()
+    route_info = route_request.routes.add() # Could add multiple
+    route_info.data.preference = preference
+
+    # Could configure defaults for these in the agent Yang params
+    # route_info.data.metric = ip['metric']
+
+    route_info.key.net_inst_name = network_instance
+    ip = ipaddress.ip_address(ip_addr)
+    route_info.key.ip_prefix.ip_addr.addr = ip.packed
+    route_info.key.ip_prefix.prefix_length = int(prefix_len)
+
+    #
+    # SDK allows to either specify a NHG name, or a list of nexthop IPs
+    #
+    route_info.data.nexthop_group_name = nhg_name + '_sdk' # Must end with '_sdk'
+    # for _i in nexthop_ips:
+    #    nexthop = route_info.nexthop.add()
+    #    nh.resolve_to = route_service_pb2.NextHop.DIRECT  # INDIRECT?
+    #    nh.type = route_service_pb2.NextHop.REGULAR
+        # SRL does not allow link local address to be used as NH, use mapped ipv4
+    #    nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
+
+    logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
+    route_response = route_stub.RouteAddOrUpdate(request=route_request,metadata=metadata)
+    logging.info(f"RouteAddOrUpdate RESPONSE:: {route_response.status} {route_response.error_str}")
+    return route_response.status != 0
+
+def SDK_DelRoute(network_instance,ip_addr,prefix_len):
+    route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
+    route_request = route_service_pb2.RouteDeleteRequest()
+    route_info = route_request.routes.add()
+    route_info.net_inst_name = network_instance
+    ip = ipaddress.ip_address(ip_addr)
+    route_info.ip_prefix.ip_addr.addr = ip.packed
+    route_info.ip_prefix.prefix_length = int(prefix_len)
+    # route_info.data.nexthop_group_name = no need to set this
+
+    logging.info(f"RouteDeleteRequest REQUEST :: {route_request}")
+    route_response = route_stub.RouteDelete(request=route_request,metadata=metadata)
+    logging.info(f"RouteDeleteRequest RESPONSE:: {route_response.status} {route_response.error_str}")
+    return route_response.status != 0
+
+def Add_Route(network_instance, netlink_msg, preference, use_v4):
+    # logging.info( f"Add_Route {network_instance} pref={preference} m={netlink_msg}" )
+    prefix = netlink_msg['attrs'][1][1] # RTA_DST
+    length = netlink_msg['dst_len']
+    # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
+    version = "v6" if netlink_msg['family'] == 10 or not use_v4 else "v4"
+
+    # def get_ipv6_nh(attrs):
+    #     if attrs[0] == "RTA_VIA":
+    #         return attrs[1]['addr']
+    #     elif attrs[0] == "RTA_GATEWAY":
+    #         return attrs[1]
+    #     else:
+    #         logging.error( f"Unable to find IPv6 nexthop: {attrs[0]}" )
+    #         return None
+
+    att4 = netlink_msg['attrs'][4]
+    if att4[0] == "RTA_MULTIPATH":
+      # for v in att4[1]:
+         # via_v6 = get_ipv6_nh( v['attrs'][0] )
+      #     oif = v['oif']
+      #     logging.info( f"multipath[oif={oif}] Add_Route {prefix}/{length}" )
+      #     SDK_AddRoute(network_instance,oif,prefix,length,preference)
+
+      # For now, assume *all* interfaces are listed
+      logging.info( f"Add_Route {prefix}/{length} oif=MULTIPATH assuming *" )
+      SDK_AddRoute(network_instance,version,prefix,length,preference)
+    else:
+      # via_v6 = get_ipv6_nh( att4 )
+      oif = netlink_msg['attrs'][5][1] # RTA_OIF
+      logging.info( f"Add_Route {prefix}/{length} oif={oif}" )
+      SDK_AddRoute(network_instance,f"{version}_{oif}",prefix,length,preference)
+
+def Del_Route(network_instance, netlink_msg):
+    prefix = netlink_msg['attrs'][1][1] # RTA_DST
+    length = netlink_msg['dst_len']
+    logging.info( f"Del_Route {prefix}/{length}" )
+    return SDK_DelRoute(network_instance,prefix,length)
+
+#
+# Registers an IPDB callback handler for route events in the given VRF instance
+# optional initial set of interfaces to create placeholder NHGs for
+#
+def RegisterRouteHandler(net_inst,preference,interfaces,use_v4):
+  logging.info( f"RegisterRouteHandler({net_inst},preference={preference})" )
+
+  # During system startup, wait for netns to be created
+  while not os.path.exists( f'/var/run/netns/srbase-{net_inst}' ):
+     logging.info( f"Waiting for srbase-{net_inst} netns to be created...")
+     time.sleep(1)
+
+  # Need to do this in a separate thread, not same as processing config
+  ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
+
+  # Create placeholders for NextHop groups
+  if use_v4:
+      SDK_AddNHG(net_inst,'v4') # "all" interfaces, ipv4
+  SDK_AddNHG(net_inst,'v6') # "all" interfaces, ipv6
+  for i in interfaces:
+      logging.info( f"RegisterRouteHandler: Pre-creating NHGs for '{i}'" )
+      if i in ipdb.interfaces:
+         _index = ipdb.interfaces[i]['index']
+         if use_v4:
+             SDK_AddNHG(net_inst,f"v4_{_index}")
+         SDK_AddNHG(net_inst,f"v6_{_index}")
+      else:
+         logging.error( f"Interface not found in IPDB: '{i}'? {ipdb.interfaces}" )
+
+  # Register our callback to the IPDB
+  def netlink_callback(ipdb, msg, action):
+      # logging.info(f"IPDB callback msg={msg} action={action}")
+      if action=="RTM_NEWROUTE" and msg['proto'] == 186: # BGP route
+         logging.info( f"Routehandler {net_inst}: Add_Route {msg}" )
+         Add_Route( net_inst, msg, preference, use_v4 )
+      elif action=="RTM_DELROUTE" and msg['proto'] == 186: # BGP route
+         logging.info( f"Routehandler {net_inst}: Del_Route {msg}" )
+         Del_Route( net_inst, msg )
+      else:
+         logging.info( f"netlink_callback: Ignoring {action}" )
+
+  ipdb.register_callback(netlink_callback)
+  return ipdb
+
 
 #
 # Runs as a separate thread
@@ -264,11 +498,18 @@ class MonitoringThread(Thread):
 
       ni = self.state.network_instances[ self.net_inst ]
       cfg = ni['config']
-
-      # Create Prefix manager, this starts listening to netlink route events
-      from prefix-mgr import PrefixManager
-      self.prefix_mgr = PrefixManager( self.net_inst, gnmi_channel, metadata,
-                                       int(cfg['bgp_preference']) )
+      use_v4 = cfg['bgp_link_local_range']!='ipv6'
+      if self.net_inst in self.state.ipdbs:
+         ipdb, _ = self.state.ipdbs[ self.net_inst ]
+      else:
+         if use_v4:
+            ni['v4'] = {} # Start list of IPv4 nexthops
+         ni['v6'] = {}
+         ipdb = RegisterRouteHandler( self.net_inst,
+                                      int(cfg['bgp_preference']),
+                                      self.interfaces,
+                                      use_v4=use_v4 )
+         self.state.ipdbs[ self.net_inst ] = (ipdb, use_v4)
 
       # Create per-thread gNMI stub, using a global channel
       gnmi_stub = gNMIStub( gnmi_channel )
@@ -313,9 +554,21 @@ class MonitoringThread(Thread):
                       logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, gnmi_stub )
+                      peer_v4, peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, cfg['bgp_link_local_range'], gnmi_stub )
+                      # ConfigureNextHopGroup( self.net_inst, _i, peerId, gnmi_stub )
+                      intf_index = ipdb.interfaces[_i]['index'] # Matches 'oif' in netlink
 
-                      self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_v6 )
+                      # Update NHGs with ipv4/v6 addresses for peer
+                      # SDK_AddNHG( self.net_inst, intf_index, peer_v4, peer_v6 )
+                      if peer_v4 is not None: # ipv4 may be disabled
+                         ni[ 'v4' ][ peer_v4 ] = True
+                         SDK_AddNHG(self.net_inst,"v4",ni[ 'v4' ])
+                         SDK_AddNHG(self.net_inst,f"v4_{intf_index}",[peer_v4])
+
+                      ni[ 'v6' ][ peer_v6 ] = True # cannot use 'neighbor'
+                      SDK_AddNHG(self.net_inst,"v6",ni[ 'v6' ])
+                      SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[peer_v6])
+
                       self.todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={self.todo}" )
                       continue
@@ -419,7 +672,7 @@ def Handle_Notification(obj, state):
                         enabled_daemons.append( "bgpd" )
 
                     params[ "frr_bgpd_port" ] = bgp['port']['value'] if 'port' in bgp else "1179"
-                    # params[ "bgp_link_local_range" ] = bgp['link_local_range']['value']
+                    params[ "bgp_link_local_range" ] = bgp['link_local_range']['value']
                     params[ "bgp_preference" ] = bgp['preference']['value']
 
                 if 'eigrp' in data:
@@ -494,6 +747,14 @@ def Handle_Notification(obj, state):
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
 
             if peer_as is not None:
+              # Make sure NHGs exists, update with IPs later
+              if net_inst in state.ipdbs:
+                logging.info( f"Pre-creating NHG for {intf}" )
+                ipdb, use_v4 = state.ipdbs[net_inst]
+                intf_index = ipdb.interfaces[intf]['index']
+                if use_v4:
+                   SDK_AddNHG(net_inst,f"v4_{intf_index}")
+                SDK_AddNHG(net_inst,f"v6_{intf_index}")
 
               # If daemon is running, it gets updated upon 'commit'
               mapping = { intf : peer_as }
@@ -607,6 +868,13 @@ def Run():
     response = stub.AgentRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
     logging.info(f"Registration response : {response.status}")
 
+    # TestAddLinkLocal_Nexthop_Group('link_local','169.254.0.1')
+    # TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
+
+    # Test: create dummy ECMP route pair
+    # SDK_AddNHG( "default", "dummy", [ "192.0.0.1", "192.0.0.3" ] )
+    # SDK_AddRoute( "default", "dummy", "66.66.66.66", 32, preference=99 )
+
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
     stream_id = create_subscription_response.stream_id
@@ -642,8 +910,8 @@ def Run():
         logging.error(f'Exception caught :: {e}')
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
-    # for n in state.ipdbs:
-    #   state.ipdbs[n].release()
+    for n in state.ipdbs:
+       state.ipdbs[n].release()
     Exit_Gracefully(0,0)
 
 ############################################################
