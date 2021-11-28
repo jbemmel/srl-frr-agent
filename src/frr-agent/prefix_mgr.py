@@ -5,7 +5,7 @@ from sdk_protos import route_service_pb2,route_service_pb2_grpc
 from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2
 from sdk_protos import nexthop_group_service_pb2_grpc as ndk_nhg_grpc
 
-NHG_ALL = "all_bgp_unnumbered"
+NHG_ALL = "all_bgp_unnumbered_peers"
 
 class PrefixManager:
     """

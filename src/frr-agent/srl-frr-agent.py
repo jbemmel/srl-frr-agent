@@ -267,7 +267,7 @@ class MonitoringThread(Thread):
 
       # Create Prefix manager, this starts listening to netlink route events
       from prefix_mgr import PrefixManager
-      self.prefix_mgr = PrefixManager( self.net_inst, gnmi_channel, metadata,
+      self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata,
                                        int(cfg['bgp_preference']) )
 
       # Create per-thread gNMI stub, using a global channel
