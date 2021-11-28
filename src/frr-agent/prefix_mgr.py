@@ -229,7 +229,7 @@ class PrefixManager:
         nhg_info.key.name = nhg_name( groupname )
 
         assert( groupname in self.nhg_2_peer_ipv6s )
-        for ipv6_nexthop in self.nhg_2_peer_ipv6s[groupname].keys():
+        for ipv6_nexthop in sorted(self.nhg_2_peer_ipv6s[groupname].keys()):
           nh = nhg_info.data.next_hop.add()
           nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT
           nh.type = ndk_nhg_pb2.NextHop.REGULAR
