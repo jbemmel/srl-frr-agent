@@ -90,21 +90,23 @@ class PrefixManager:
            #     SDK_AddRoute(network_instance,oif,prefix,length,preference)
 
            # For now, assume *all* interfaces are listed
-           logging.info( f"Add_Route {prefix}/{length} oif=MULTIPATH assuming *({att4[1]})" )
+           logging.info( f"add_Route {prefix}/{length} oif=MULTIPATH assuming *({att4[1]})" )
            oif = 0
        else:
            # via_v6 = get_ipv6_nh( att4 )
            oif = netlink_msg['attrs'][5][1] # RTA_OIF
-       logging.info( f"Add_Route {prefix}/{length} oif={oif}" )
+       logging.info( f"add_Route {prefix}/{length} oif={oif}" )
 
        # Check if the interface has been resolved, if not add to pending list
        route = [ (prefix, length) ]
        if oif in self.oif_2_interface:
            self.NDK_AddRoutes(self.oif_2_interface[oif],routes=route)
-       elif oif in self.pending_routes:
-           self.pending_routes[oif] += route
        else:
-           self.pending_routes[oif] = route
+           if oif in self.pending_routes:
+               self.pending_routes[oif] += route
+           else:
+               self.pending_routes[oif] = route
+           logging.info( f"Route added to pending routes: {self.pending_routes}" )
 
     def NDK_AddRoutes(self,interface,routes):
         """
