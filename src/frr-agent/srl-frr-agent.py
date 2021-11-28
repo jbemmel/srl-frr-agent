@@ -469,17 +469,22 @@ class MonitoringThread(Thread):
        # Check that gNMI is connected now
        grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
-   def UpdateInterfaces(self,interfaces):
-      changes = False
-      for i,peer_as in interfaces.items():
-          if i not in self.interfaces:
-             # ipdb, use_ipv4 = self.state.ipdbs[ self.net_inst ]
-             logging.info( f"Updating BGP interface: {i}" )
-             self.interfaces.update( { i: peer_as } )
-             self.todo.append( i )
-             changes = True
+   def CheckForUpdatedInterfaces(self):
+      ni = self.state.network_instances[ self.net_inst ]
+      cfg = ni['config']
+      cli = cfg['bgp_neighbor_lines'] if 'bgp_neighbor_lines' in cfg else ""
+      changes = 0
+      for i,peer_as in self.interfaces.items():
+        if i not in cli:
+           # ipdb, use_ipv4 = self.state.ipdbs[ self.net_inst ]
+           logging.info( f"UpdateInterfaces: activate BGP interface {i}" )
+           self.todo.append( i )
+           changes += 1
+        else:
+           logging.info( f"UpdateInterfaces: already have {i}: {cli}" )
 
-      if changes:
+      if changes > 0:
+         logging.info( f"UpdateInterfaces: Signalling update event changes={changes}" )
          self.event.set()
 
    def run(self):
@@ -841,7 +846,7 @@ def UpdateDaemons( state, modified_netinstances ):
           ni['monitor_thread'].start()
        else:
           logging.info( f"MonitorThread already running, sending updated(?) list: {interfaces}" )
-          ni['monitor_thread'].UpdateInterfaces( interfaces )
+          ni['monitor_thread'].CheckForUpdatedInterfaces()
 
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.
