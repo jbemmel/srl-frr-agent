@@ -56,10 +56,10 @@ class PrefixManager:
          # logging.info(f"IPDB callback msg={msg} action={action}")
          if 'proto' in msg and msg['proto'] == 186: # BGP route
            if action=="RTM_NEWROUTE":
-              logging.info( f"Routehandler {net_inst}: add_Route {msg}" )
+              logging.debug( f"Routehandler {net_inst}: add_Route {msg}" )
               self.add_Route( msg )
            elif action=="RTM_DELROUTE":
-              logging.info( f"Routehandler {net_inst}: del_Route {msg}" )
+              logging.debug( f"Routehandler {net_inst}: del_Route {msg}" )
               self.del_Route( msg )
            else:
               logging.info( f"netlink_callback: Ignoring BGP action {action}" )
@@ -88,6 +88,10 @@ class PrefixManager:
            nhg_name = f"ecmp-{oif_mask:x}"
            if unresolved_oifs==[]:
                resolved_nhg = nhg_name
+               if nhg_name not in self.nhg_2_peer_ipv6s:
+                   self.create_ecmp_nhg( nhg_name, oifs )
+               else:
+                   logging.info( f"ECMP NHG: {self.nhg_2_peer_ipv6s[nhg_name]}")
            else:
                oif = nhg_name # Used as key in pending_routes
                self.unresolved_ecmp_groups[nhg_name] = (oifs, unresolved_oifs)
@@ -96,7 +100,7 @@ class PrefixManager:
            if oif in self.oif_2_interface:
                resolved_nhg = self.oif_2_interface[oif]
 
-       logging.info( f"add_Route {prefix}/{length} resolved_nhg={resolved_nhg}" )
+       logging.info( f"add_Route {prefix}/{length} resolved_nhg={resolved_nhg}")
 
        # Check if the interface has been resolved, if not add to pending list
        route = [ (prefix, length) ]
@@ -144,7 +148,7 @@ class PrefixManager:
     def del_Route( self, netlink_msg ):
         prefix = netlink_msg['attrs'][1][1] # RTA_DST
         length = netlink_msg['dst_len']
-        logging.info( f"Del_Route {prefix}/{length}" )
+        logging.info( f"del_Route {prefix}/{length}" )
         return self.NDK_DeleteRoutes( routes=[(prefix,length)] )
 
     def NDK_DeleteRoutes( self, routes ):
@@ -166,6 +170,29 @@ class PrefixManager:
         return route_del_response.status == 0
         # TODO after last route is removed, cleanup NHG too
 
+    def resolve_pending_routes(self,key,nhg_name):
+        if key in self.pending_routes:
+            self.NDK_AddRoutes( nhg_name, self.pending_routes[key] )
+            del self.pending_routes[key]
+            logging.info( f"resolve_pending_routes routes added, remaining={self.pending_routes}" )
+        else:
+            logging.info( f"resolve_pending_routes no routes pending for {key} nhg={nhg_name}" )
+
+    def create_ecmp_nhg(self,nhg_name,oifs):
+        """
+        Creates a new ECMP NHG, and resolves any pending routes
+        """
+        assert( nhg_name not in self.nhg_2_peer_ipv6s )
+        logging.info( f"create_ecmp_nhg {nhg_name} oifs={oifs}" )
+        nhg_ipv6s = {}
+        for oif in oifs:
+           ifname = self.oif_2_interface[oif]
+           ipv6 = self.nhg_2_peer_ipv6s[ifname].keys()[0]
+           nhg_ipv6s[ipv6] = oif
+        self.nhg_2_peer_ipv6s[nhg_name] = nhg_ipv6s
+        self.NDK_AddOrUpdateNextHopGroup( nhg_name )
+        self.resolve_pending_routes( nhg_name, nhg_name )
+
     def onInterfaceBGPv6Connected(self,interface,peer_ipv6):
         """
         Called when FRR BGP unnumbered ipv6 session comes up
@@ -176,33 +203,18 @@ class PrefixManager:
         self.nhg_2_peer_ipv6s[interface] = { peer_ipv6: intf_index }
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
-        def resolve_pending_routes(key,nhg_name):
-            if key in self.pending_routes:
-                self.NDK_AddRoutes( nhg_name, self.pending_routes[key] )
-                del self.pending_routes[key]
-                logging.info( f"onInterfaceBGPv6Connected routes added, remaining={self.pending_routes}" )
-            else:
-                logging.info( f"onInterfaceBGPv6Connected no routes pending for {key} nhg={nhg_name}" )
-
         # Also update any ECMP groups that this interface belongs to
         for nhg_name in self.unresolved_ecmp_groups.keys():
             oifs, unresolved_oifs = self.unresolved_ecmp_groups[nhg_name]
             if intf_index in unresolved_oifs:
                if len(unresolved_oifs)==1:
                    del self.unresolved_ecmp_groups[nhg_name]
-                   nhg_ipv6s = {}
-                   for oif in oifs:
-                      ifname = self.oif_2_interface[oif]
-                      ipv6 = self.nhg_2_peer_ipv6s[ifname]
-                      nhg_ipv6s[ipv6] = oif
-                   self.nhg_2_peer_ipv6s[nhg_name] = nhg_ipv6s
-                   self.NDK_AddOrUpdateNextHopGroup( nhg_name )
-                   resolve_pending_routes( nhg_name, nhg_name )
+                   self.create_ecmp_nhg( nhg_name, oifs )
                else:
                    unresolved_oifs.remove( intf_index )
                    self.unresolved_ecmp_groups[nhg_name] = (oifs, unresolved_oifs)
 
-        resolve_pending_routes( intf_index, nhg_name=interface )
+        self.resolve_pending_routes( intf_index, nhg_name=interface )
         logging.info( f"onInterfaceBGPv6Connected unresolved ECMP left={self.unresolved_ecmp_groups}" )
     #
     # Creates or updates next hop group for a given (resolved) interface,
