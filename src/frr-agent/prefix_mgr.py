@@ -187,7 +187,7 @@ class PrefixManager:
         nhg_ipv6s = {}
         for oif in oifs:
            ifname = self.oif_2_interface[oif]
-           ipv6 = self.nhg_2_peer_ipv6s[ifname].keys()[0]
+           ipv6 = list(self.nhg_2_peer_ipv6s[ifname].keys())[0]
            nhg_ipv6s[ipv6] = oif
         self.nhg_2_peer_ipv6s[nhg_name] = nhg_ipv6s
         self.NDK_AddOrUpdateNextHopGroup( nhg_name )
