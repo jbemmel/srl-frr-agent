@@ -90,15 +90,6 @@ fi
 
 if [[ "$bgp" == "enable" ]]; then
 
-if [[ "$bgp_link_local_range" != "ipv6" ]]; then
-IFS='' read -r -d '' IPV4_ROUTEMAP_PREFIX_DENY << EOF
-ip prefix-list link_local_v4 seq 5 permit ${bgp_link_local_range} ge 31 le 32
-!
-route-map drop_link_routes_v4 deny 10
- match ip address prefix-list link_local_v4
-EOF
-fi
-
 IFS='' read -r -d '' BGP_CONFIG << EOF
 router bgp $autonomous_system
  bgp router-id $router_id
@@ -130,9 +121,7 @@ router bgp $autonomous_system
  exit-address-family
  !
 !
-\${IPV4_ROUTEMAP_PREFIX_DENY}
-!
-route-map drop_link_routes_v4 permit 20
+route-map drop_link_routes_v4 permit 10
 !
 ipv6 prefix-list link_local_v6 seq 5 permit fd00::/16 ge 127 le 128
 !
