@@ -449,16 +449,38 @@ def RegisterRouteHandler(net_inst,preference,interfaces,use_v4):
 #
 # Runs as a separate thread
 #
-from threading import Thread
+# Responsible for (re)starting FRR daemon(s) to update their config, and
+# monitoring ipdb for route updates.
+#
+# Multi-threading logic quickly gets complicated; simpler to restart the
+# daemon each time an interface is added/removed, rather than call vtysh with
+# dynamic updates
+#
+from threading import Thread, Event
 class MonitoringThread(Thread):
    def __init__(self, state, net_inst, interfaces):
        Thread.__init__(self)
+       self.daemon = True # Mark thread as a daemon thread
        self.state = state
+       self.event = Event()
        self.net_inst = net_inst
        self.interfaces = interfaces # dict of intf->as
 
        # Check that gNMI is connected now
        grpc.channel_ready_future(gnmi_channel).result(timeout=5)
+
+   def UpdateInterfaces(self,interfaces):
+      changes = False
+      for i,peer_as in interfaces.items():
+          if i not in self.interfaces:
+             # ipdb, use_ipv4 = self.state.ipdbs[ self.net_inst ]
+             logging.info( f"Updating BGP interface: {i}" )
+             self.interfaces.update( { i: peer_as } )
+             self.todo.append( i )
+             changes = True
+
+      if changes:
+         self.event.set()
 
    def run(self):
       logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
@@ -478,22 +500,32 @@ class MonitoringThread(Thread):
                                       use_v4=use_v4 )
          self.state.ipdbs[ self.net_inst ] = (ipdb, use_v4)
 
-      # (re)start or stop FRR daemons
-      if 'frr' not in ni or ni['frr'] not in ['running','stopped']:
-         script_update_frr( **cfg )
-         ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
-
       # Create per-thread gNMI stub, using a global channel
       gnmi_stub = gNMIStub( gnmi_channel )
 
-      # NEW: Enable IPv4 over IPv6, TODO change route next hop logic accordingly
-      # Requires native BGP to be provisioned too, not currently done
-      # EnableIPv4OverIPv6( self.net_inst, gnmi_stub )
+      def add_interface_to_config(i):
+        """
+        Updates FRR config lines that specify interfaces to listen/connect on
+        and (re)starts the daemon for changes to take effect
+        """
+        if 'bgp_neighbor_lines' not in cfg or i not in cfg['bgp_neighbor_lines']:
+           lines = ""
+           for name,peer_as in ni['bgp_interfaces'].items():
+             # Add single indent space at end
+             lines += f'neighbor {name} interface v6only remote-as {peer_as}\n '
+             # Use configured BGP port, custom patch
+             lines += f'neighbor {name} port {cfg["frr_bgpd_port"]}\n '
+           cfg["bgp_neighbor_lines"] = lines
+           logging.info( f"About to (re)start FRR in {ni} to add {i}" )
+           script_update_frr( **cfg )
+           ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
 
       try:
-        todo = list( self.interfaces.keys() )
-        while todo != []:
-          for _i in todo:
+        self.todo = list( self.interfaces.keys() ) # Initial list
+        while True: # Keep waiting for interfaces to be added/removed
+          while self.todo!=[]:
+           for _i in self.todo:
+            add_interface_to_config(_i)
             _get_peer = f'show bgp neighbors {_i} json'
             json_data = run_vtysh( ns=self.net_inst, show=[_get_peer] )
             if json_data:
@@ -526,11 +558,17 @@ class MonitoringThread(Thread):
                       SDK_AddNHG(self.net_inst,"v6",ni[ 'v6' ])
                       SDK_AddNHG(self.net_inst,f"v6_{intf_index}",[peer_v6])
 
-                      todo.remove( _i )
-                      logging.info( f"MonitoringThread done with {_i}, left={todo}" )
+                      self.todo.remove( _i )
+                      logging.info( f"MonitoringThread done with {_i}, left={self.todo}" )
+                else:
+                  logging.info( f"MonitoringThread {_i} not in output, wait 10s" )
+                  time.sleep(10)
+                  logging.info( f"MonitoringThread wakes up left={self.todo}" )
+          logging.info( "MonitoringThread done processing TODO list, waiting for events..." )
+          self.event.wait(timeout=None)
+          logging.info( f"MonitoringThread received event, TODO={self.todo}" )
+          self.event.clear() # Reset for next iteration
 
-          time.sleep(10)
-          logging.info( f"MonitoringThread wakes up left={todo}" )
       except Exception as e:
          traceback_str = ''.join(traceback.format_tb(e.__traceback__))
          logging.error( f"MonitoringThread error: {e} trace={traceback_str}" )
@@ -538,7 +576,8 @@ class MonitoringThread(Thread):
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
 
 #
-# Adds or removes NHG for given interface
+# Adds or removes given interface using vtysh
+# Not currently used
 # peer_as := internal | external | None (->remove)
 def UpdateBGPInterface(ni,intf,peer_as):
     cfg = ni['config']
@@ -556,7 +595,11 @@ def UpdateBGPInterface(ni,intf,peer_as):
     if 'frr' in ni and ni['frr']=='running':
        if 'bgp' in cfg and cfg['bgp']=='enable':
           ctxt = f"router bgp {cfg['autonomous_system']}"
-          run_vtysh( ns=net_inst, context=ctxt, config=cmd )
+          res = run_vtysh( ns=net_inst, context=ctxt, config=cmd )
+          logging.info( f"UpdateBGPInterface: {res}" )
+          # TODO return true/false for success
+
+    return False
 
 ##################################################################
 ## Updates configuration state based on 'config' notifications
@@ -646,17 +689,7 @@ def Handle_Notification(obj, state):
                    params[ "openfabric" ] = "disable"
 
                 # Could dynamically create CPM filter for IP proto 88
-                if 'bgp_interfaces' in ni:
-                    if "bgpd" in enabled_daemons:
-                      lines = ""
-                      for name,peer_as in ni['bgp_interfaces'].items():
-                        # Add single indent space at end
-                        lines += f'neighbor {name} interface v6only remote-as {peer_as}\n '
-                        # Use configured BGP port, custom patch
-                        lines += f'neighbor {name} port {params[ "frr_bgpd_port" ]}\n '
-
-                      params[ "bgp_neighbor_lines" ] = lines
-
+                if 'openfabric_interfaces' in ni:
                     if 'openfabric_name' in params:
                       _of = params['openfabric_name' ]
                       lines2 = ""
@@ -667,6 +700,7 @@ def Handle_Notification(obj, state):
                            lines2 += '\n openfabric passive'
                         lines2 += "\n!"
                       params[ "openfabric_interface_lines" ] = lines2
+                      # TODO should move this logic to monitor thread, like bgp
                 else:
                     ni = { "bgp_interfaces" : {}, "openfabric_interfaces" : {}, "config" : {} }
 
@@ -700,28 +734,26 @@ def Handle_Notification(obj, state):
 
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
 
-            # Make sure NHGs exists, update with IPs later
-            if peer_as is not None and net_inst in state.ipdbs:
-              logging.info( f"Pre-creating NHG for {intf}" )
-              ipdb, use_v4 = state.ipdbs[net_inst]
-              intf_index = ipdb.interfaces[intf]['index']
-              if use_v4:
-                 SDK_AddNHG(net_inst,f"v4_{intf_index}")
-              SDK_AddNHG(net_inst,f"v6_{intf_index}")
+            if peer_as is not None:
+              # Make sure NHGs exists, update with IPs later
+              if net_inst in state.ipdbs:
+                logging.info( f"Pre-creating NHG for {intf}" )
+                ipdb, use_v4 = state.ipdbs[net_inst]
+                intf_index = ipdb.interfaces[intf]['index']
+                if use_v4:
+                   SDK_AddNHG(net_inst,f"v4_{intf_index}")
+                SDK_AddNHG(net_inst,f"v6_{intf_index}")
 
-            # lookup AS for this ns, check if enabled (i.e. daemon running)
-            if 'config' in ni and 'frr' in ni and ni['frr'] == "running":
-                UpdateBGPInterface(ni,intf,peer_as)
-            elif peer_as is not None:
-                mapping = { intf : peer_as }
-                if 'bgp_interfaces' in ni:
-                  ni['bgp_interfaces'].update( mapping )
-                elif ni=={}:
-                  state.network_instances[ net_inst ] = {
-                    "bgp_interfaces" : mapping
-                  }
-                else:
-                  ni['bgp_interfaces'] = mapping
+              # If daemon is running, it gets updated upon 'commit'
+              mapping = { intf : peer_as }
+              if 'bgp_interfaces' in ni:
+                ni['bgp_interfaces'].update( mapping )
+              elif ni=={}:
+                state.network_instances[ net_inst ] = {
+                  "bgp_interfaces" : mapping
+                }
+              else:
+                ni['bgp_interfaces'] = mapping
 
         elif obj.config.key.js_path == ".network_instance.interface.openfabric":
             logging.info("Process openfabric interface config")
@@ -802,11 +834,14 @@ class State(object):
 def UpdateDaemons( state, modified_netinstances ):
     for n in modified_netinstances:
        ni = state.network_instances[ n ]
-
+       # Shouldn't run monitoringthread more than once per interface
        interfaces = ni['bgp_interfaces'] if 'bgp_interfaces' in ni else []
-
-       # TODO shouldn't run monitoringthread more than once per interface
-       MonitoringThread( state, n, interfaces ).start()
+       if 'monitor_thread' not in ni:
+          ni['monitor_thread'] = MonitoringThread( state, n, interfaces )
+          ni['monitor_thread'].start()
+       else:
+          logging.info( f"MonitorThread already running, sending updated(?) list: {interfaces}" )
+          ni['monitor_thread'].UpdateInterfaces( interfaces )
 
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.

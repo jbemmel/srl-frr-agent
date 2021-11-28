@@ -37,6 +37,6 @@ build-srlinux: do-build
 #
 # This works but is more cumbersome, it rebuilds image every time base changes
 #
-build-auto-frr: BASEIMG=srl/auto-config-v2
-build-auto-frr:	NAME=srl/auto-frr-demo
-build-auto-frr: do-build
+# build-auto-frr: BASEIMG=srl/auto-config-v2
+# build-auto-frr:	NAME=srl/auto-frr-demo
+# build-auto-frr: do-build
