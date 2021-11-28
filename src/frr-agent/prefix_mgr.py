@@ -5,7 +5,8 @@ from sdk_protos import route_service_pb2,route_service_pb2_grpc
 from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2
 from sdk_protos import nexthop_group_service_pb2_grpc as ndk_nhg_grpc
 
-NHG_ALL = "all_bgp_unnumbered_peers"
+def nhg_name(interface):
+    return "bgpu_" + interface + "_sdk" # Must end with _sdk
 
 class PrefixManager:
     """
@@ -21,7 +22,7 @@ class PrefixManager:
         self.metadata = metadata  # Credentials for API access
         self.preference = pref    # Route preference from config
         self.oif_2_interface = { 0: [] } # Map of oif to resolved interface name
-        self.interface_2_peer_ipv6s = { NHG_ALL: {} } # name to ipv6 nexth addrs
+        self.interface_2_peer_ipv6s = {} # name to ipv6 nexthop address
         self.pending_routes = {} # Map of unresolved routes, per interface index
 
         # connect to ipdb to receive netlink messages
@@ -62,7 +63,7 @@ class PrefixManager:
            else:
               logging.info( f"netlink_callback: Ignoring BGP action {action}" )
          else:
-            logging.info( f"netlink_callback: Ignoring {action}" )
+            logging.debug( f"netlink_callback: Ignoring {action}" )
 
       self.ipdb.register_callback(netlink_callback)
 
@@ -72,36 +73,19 @@ class PrefixManager:
        # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
        # version = "v6" # if netlink_msg['family'] == 10 or not use_v4 else "v4"
 
-       # def get_ipv6_nh(attrs):
-       #     if attrs[0] == "RTA_VIA":
-       #         return attrs[1]['addr']
-       #     elif attrs[0] == "RTA_GATEWAY":
-       #         return attrs[1]
-       #     else:
-       #         logging.error( f"Unable to find IPv6 nexthop: {attrs[0]}" )
-       #         return None
-
        att4 = netlink_msg['attrs'][4]
        if att4[0] == "RTA_MULTIPATH":
-           # for v in att4[1]:
-           # via_v6 = get_ipv6_nh( v['attrs'][0] )
-           #     oif = v['oif']
-           #     logging.info( f"multipath[oif={oif}] Add_Route {prefix}/{length}" )
-           #     SDK_AddRoute(network_instance,oif,prefix,length,preference)
-
-           # For now, assume *all* interfaces are listed
-           logging.info( f"add_Route {prefix}/{length} oif=MULTIPATH assuming *({att4[1]})" )
-           oif = 0
+           oifs = [ v['oif'] for v in att4[1] ]
        else:
-           # via_v6 = get_ipv6_nh( att4 )
-           oif = netlink_msg['attrs'][5][1] # RTA_OIF
-       logging.info( f"add_Route {prefix}/{length} oif={oif}" )
+           oifs = [ netlink_msg['attrs'][5][1] ] # RTA_OIF
+       logging.info( f"add_Route {prefix}/{length} oifs={oifs}" )
 
        # Check if the interface has been resolved, if not add to pending list
        route = [ (prefix, length) ]
-       if oif in self.oif_2_interface:
+       for oif in oifs:
+         if oif in self.oif_2_interface:
            self.NDK_AddRoutes(self.oif_2_interface[oif],routes=route)
-       else:
+         else:
            if oif in self.pending_routes:
                self.pending_routes[oif] += route
            else:
@@ -130,8 +114,7 @@ class PrefixManager:
             # SDK allows to either specify a NHG name, or a list of nexthop IPs
             # nexthop = route_info.nexthop.add()
             #
-            nhg_name = f"{interface}_sdk" # Must end with '_sdk'
-            route_info.data.nexthop_group_name = nhg_name
+            route_info.data.nexthop_group_name = nhg_name( interface )
 
         logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
         route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(self.channel)
@@ -173,15 +156,13 @@ class PrefixManager:
         logging.info( f"onInterfaceBGPv6Connected {interface} {peer_ipv6}" )
         intf_index = self.ipdb.interfaces[interface]['index'] # == netlink 'oif'
         self.oif_2_interface[intf_index] = interface
-        self.oif_2_interface[0].append( interface ) # Add to list of all ifs
-        self.interface_2_peer_ipv6s[NHG_ALL].update( { peer_ipv6: intf_index } )
-        self.NDK_AddOrUpdateNextHopGroup( NHG_ALL )
         self.interface_2_peer_ipv6s[interface] = { peer_ipv6: intf_index }
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
         if intf_index in self.pending_routes:
             self.NDK_AddRoutes( interface, self.pending_routes[intf_index] )
             del self.pending_routes[intf_index]
+            logging.info( f"onInterfaceBGPv6Connected remaining={self.pending_routes}" )
 
     #
     # Creates or updates next hop group for a given (resolved) interface,
@@ -193,7 +174,7 @@ class PrefixManager:
 
         nhg_info = nh_request.group_info.add()
         nhg_info.key.network_instance_name = self.network_instance
-        nhg_info.key.name = interface + '_sdk' # Must end with '_sdk'
+        nhg_info.key.name = nhg_name( interface )
 
         assert( interface in self.interface_2_peer_ipv6s )
         for ipv6_nexthop in self.interface_2_peer_ipv6s[interface].keys():
