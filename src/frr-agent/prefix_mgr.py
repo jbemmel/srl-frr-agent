@@ -21,8 +21,9 @@ class PrefixManager:
         self.channel = gnmi_channel
         self.metadata = metadata  # Credentials for API access
         self.preference = pref    # Route preference from config
-        self.oif_2_interface = { 0: [] } # Map of oif to resolved interface name
-        self.interface_2_peer_ipv6s = {} # name to ipv6 nexthop address
+        self.oif_2_interface = {} # Map of oif to resolved interface name
+        self.nhg_2_peer_ipv6s = {} # NHG name to ipv6 nexthop address(es)
+        self.unresolved_ecmp_groups = {} # ECMP routes, key=oif bitmask
         self.pending_routes = {} # Map of unresolved routes, per interface index
 
         # connect to ipdb to receive netlink messages
@@ -74,23 +75,39 @@ class PrefixManager:
        # version = "v6" # if netlink_msg['family'] == 10 or not use_v4 else "v4"
 
        att4 = netlink_msg['attrs'][4]
-       if att4[0] == "RTA_MULTIPATH":
+       resolved_nhg = None
+       if att4[0] == "RTA_MULTIPATH": # Handle ECMP routes
+           # Calculate bitmasked OR of interface indices
+           oif_mask = 0
+           unresolved_oifs = []
            oifs = [ v['oif'] for v in att4[1] ]
+           for oif in oifs:
+               oif_mask |= (1<<oif)
+               if oif not in self.oif_2_interface:
+                   unresolved_oifs.append( oif )
+           nhg_name = f"ecmp-{oif_mask:x}"
+           if unresolved_oifs==[]:
+               resolved_nhg = nhg_name
+           else:
+               oif = nhg_name # Used as key in pending_routes
+               self.unresolved_ecmp_groups[nhg_name] = (oifs, unresolved_oifs)
        else:
-           oifs = [ netlink_msg['attrs'][5][1] ] # RTA_OIF
-       logging.info( f"add_Route {prefix}/{length} oifs={oifs}" )
+           oif = netlink_msg['attrs'][5][1] # RTA_OIF
+           if oif in self.oif_2_interface:
+               resolved_nhg = self.oif_2_interface[oif]
+
+       logging.info( f"add_Route {prefix}/{length} resolved_nhg={resolved_nhg}" )
 
        # Check if the interface has been resolved, if not add to pending list
        route = [ (prefix, length) ]
-       for oif in oifs:
-         if oif in self.oif_2_interface:
-           self.NDK_AddRoutes(self.oif_2_interface[oif],routes=route)
-         else:
+       if resolved_nhg:
+           self.NDK_AddRoutes(resolved_nhg,routes=route)
+       else:
            if oif in self.pending_routes:
                self.pending_routes[oif] += route
            else:
                self.pending_routes[oif] = route
-           logging.info( f"Route added to pending routes: {self.pending_routes}" )
+               logging.info( f"Route added to pending routes: {self.pending_routes}" )
 
     def NDK_AddRoutes(self,interface,routes):
         """
@@ -156,28 +173,51 @@ class PrefixManager:
         logging.info( f"onInterfaceBGPv6Connected {interface} {peer_ipv6}" )
         intf_index = self.ipdb.interfaces[interface]['index'] # == netlink 'oif'
         self.oif_2_interface[intf_index] = interface
-        self.interface_2_peer_ipv6s[interface] = { peer_ipv6: intf_index }
+        self.nhg_2_peer_ipv6s[interface] = { peer_ipv6: intf_index }
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
-        if intf_index in self.pending_routes:
-            self.NDK_AddRoutes( interface, self.pending_routes[intf_index] )
-            del self.pending_routes[intf_index]
-            logging.info( f"onInterfaceBGPv6Connected remaining={self.pending_routes}" )
+        def resolve_pending_routes(key,nhg_name):
+            if key in self.pending_routes:
+                self.NDK_AddRoutes( nhg_name, self.pending_routes[key] )
+                del self.pending_routes[key]
+                logging.info( f"onInterfaceBGPv6Connected routes added, remaining={self.pending_routes}" )
+            else:
+                logging.info( f"onInterfaceBGPv6Connected no routes pending for {key} nhg={nhg_name}" )
 
+        # Also update any ECMP groups that this interface belongs to
+        for nhg_name in self.unresolved_ecmp_groups.keys():
+            oifs, unresolved_oifs = self.unresolved_ecmp_groups[nhg_name]
+            if intf_index in unresolved_oifs:
+               if len(unresolved_oifs)==1:
+                   del self.unresolved_ecmp_groups[nhg_name]
+                   nhg_ipv6s = {}
+                   for oif in oifs:
+                      ifname = self.oif_2_interface[oif]
+                      ipv6 = self.nhg_2_peer_ipv6s[ifname]
+                      nhg_ipv6s[ipv6] = oif
+                   self.nhg_2_peer_ipv6s[nhg_name] = nhg_ipv6s
+                   self.NDK_AddOrUpdateNextHopGroup( nhg_name )
+                   resolve_pending_routes( nhg_name, nhg_name )
+               else:
+                   unresolved_oifs.remove( intf_index )
+                   self.unresolved_ecmp_groups[nhg_name] = (oifs, unresolved_oifs)
+
+        resolve_pending_routes( intf_index, nhg_name=interface )
+        logging.info( f"onInterfaceBGPv6Connected unresolved ECMP left={self.unresolved_ecmp_groups}" )
     #
     # Creates or updates next hop group for a given (resolved) interface,
     # using the NDK
     #
-    def NDK_AddOrUpdateNextHopGroup( self, interface ):
-        logging.info(f"NDK_AddOrUpdateNextHopGroup :: interface={interface}")
+    def NDK_AddOrUpdateNextHopGroup( self, groupname ):
+        logging.info(f"NDK_AddOrUpdateNextHopGroup :: groupname={groupname}")
         nh_request = ndk_nhg_pb2.NextHopGroupRequest()
 
         nhg_info = nh_request.group_info.add()
         nhg_info.key.network_instance_name = self.network_instance
-        nhg_info.key.name = nhg_name( interface )
+        nhg_info.key.name = nhg_name( groupname )
 
-        assert( interface in self.interface_2_peer_ipv6s )
-        for ipv6_nexthop in self.interface_2_peer_ipv6s[interface].keys():
+        assert( groupname in self.nhg_2_peer_ipv6s )
+        for ipv6_nexthop in self.nhg_2_peer_ipv6s[groupname].keys():
           nh = nhg_info.data.next_hop.add()
           nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT
           nh.type = ndk_nhg_pb2.NextHop.REGULAR
