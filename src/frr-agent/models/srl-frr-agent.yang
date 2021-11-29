@@ -88,6 +88,15 @@ module srl-frr-agent {
                 default true; // For some reason we cannot create ipv6 link-local nexthops via NDK
               }
 
+              leaf use-ipv6-nexthops-for-ipv4 {
+                description "Flag to enable the use of IPv6 nexthops for IPv4, default disabled";
+                type boolean;
+                default false; // to avoid bgp mgr crashes
+                must ".=false() or not(../../../bgp)" {
+                  error-message "Cannot use ipv6 nexthops for ipv4 when bgp is used";
+                }
+              }
+
               leaf route-import {
                 description "Selects the route import mechanism";
                 type enumeration {

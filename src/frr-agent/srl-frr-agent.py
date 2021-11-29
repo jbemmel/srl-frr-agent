@@ -86,23 +86,23 @@ def Subscribe_Notifications(stream_id):
 #
 # Avoids a crash in BGP mgr by rejecting ipv4 routes on import
 #
-def ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub ):
-
-    reject_ipv4 = {
-      "default-action": { "accept": { } },
-      "statement": [
-        {
-          "sequence-id": 10,
-          "match": { "family": "srl_nokia-common:ipv4-unicast" },
-          "action": { "reject": { } }
-        }
-      ]
-    }
-    imp_policy = { 'import-policy' : "reject-ipv4" }
-    updates = [ ( '/routing-policy/policy[name=reject-ipv4]', reject_ipv4 ),
-                ( '/network-instance[name=default]/protocols/bgp', imp_policy )
-              ]
-    gNMI_Set( gnmi_stub, updates=updates )
+#def ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub ):
+#
+#    reject_ipv4 = {
+#      "default-action": { "accept": { } },
+#      "statement": [
+#        {
+#          "sequence-id": 10,
+#          "match": { "family": "srl_nokia-common:ipv4-unicast" },
+#          "action": { "reject": { } }
+#        }
+#      ]
+#    }
+#    imp_policy = { 'import-policy' : "reject-ipv4" }
+#    updates = [ ( '/routing-policy/policy[name=reject-ipv4]', reject_ipv4 ),
+#                ( '/network-instance[name=default]/protocols/bgp', imp_policy )
+#              ]
+#    gNMI_Set( gnmi_stub, updates=updates )
 
 #
 # Uses gNMI to get /platform/chassis/mac-address and format as hhhh.hhhh.hhhh
@@ -143,105 +143,6 @@ def ipv6_2_mac(ipv6):
     return ":".join(macParts)
 
 #
-# Statically configures an IPv6 address on the given interface
-#
-# IPv4: for local resolution to the nexthop MAC, now removed
-# IPv6: SRL does not support using link local IPv6 address as next hop
-#
-def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, gnmi_stub ):
-   logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
-   phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
-   base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
-
-   # Calculates a /127 to use in fc00::/7 private space, based on node IDs
-   # See RFC4193 https://datatracker.ietf.org/doc/html/rfc4193
-   def CalcIPv6LinkIPs():
-      lo_ip = min( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
-      hi_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
-      lo = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(lo_ip).split('.')))
-      hi = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(hi_ip).split('.')))
-      # Local private ipv6 address based on RFC4193, generated from both router IDs
-      # Use 2 * last octet of smaller router ID as unique link distinguisher
-      # On cSRL MACs start with :01 on e1-1, but this may not be universal -> no -1
-      link_octet = int( (local_v6 if local_ip == str(lo_ip) else mac).split(':')[-1], 16 )
-      private_v6 = ipaddress.ip_address( f"fd00:{hi}:{lo}::{(2*link_octet):x}" )
-      logging.info( f"ConfigurePeerIPMAC selecting private RFC4193 IPv6: {private_v6}" )
-      v6_subnet = ipaddress.ip_network( str(private_v6) + '/127', strict=False )
-      i6 = list( map( str, v6_subnet.hosts() ) )
-      return ( i6[0], i6[1] ) if local_ip == str(lo_ip) else ( i6[1], i6[0] )
-
-   # intip = int(router_id)
-   # last_octet = (intip % 256)
-   #  ip2 = intip + last_octet # Double last octet, may overflow into next
-   #  return ipaddress.ip_address( ip2 )
-
-   # For IPv6, build a /127 based on mapped ipv4 of  2 * highest ID
-   # (assuming leaves have higher IDs than spines)
-   # highest_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
-   # ip31 = str( ShiftIP(highest_ip) ) # Create room for /31
-   # mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
-   # v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
-   # v6_ips = list( map( str, v6_subnet.hosts() ) )
-   local_v6, peer_v6 = CalcIPv6LinkIPs()
-   logging.info( f"ConfigurePeerIPMAC local[v6]={local_v6} peer[v6]={peer_v6}" )
-
-   path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
-   desc = f"auto-configured by SRL FRR agent peer={peer_ip}"
-   config = {
-     "admin-state" : "enable",
-     "description" : desc,
-     "ipv6" : {
-       "address" : [
-          { "ip-prefix" : local_v6 + "/127",
-            "primary": '[null]'  # type 'empty'
-          }
-          # Could configure a static MAC here too, but better to use default mechanisms
-       ],
-       "router-advertisement": { "router-role": { "admin-state": "disable" } }
-     }
-   }
-   updates=[ (path, config),
-             # XXX hardcoded default network instance
-             ('/network-instance[name=default]/ip-forwarding', { 'receive-ipv4-check': False } ),
-             # ('/network-instance[name=default]/protocols/bgp/ipv4-unicast',
-             # { 'admin-state': 'disable' } ), # Avoid BGP mgr crash
-             #('/network-instance[name=default]/protocols/bgp/ipv6-unicast',
-             # { 'admin-state': 'enable' } ),  # At least 1 family must be enabled
-             # { 'advertise-ipv6-next-hops': True, 'receive-ipv6-next-hops': True, } ),
-           ]
-
-   gNMI_Set( gnmi_stub, updates=updates )
-   return peer_v6
-
-def gNMI_Set( gnmi_stub, updates ):
-   #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-   #                       username="admin",password="admin",
-   #                       insecure=True, debug=True) as gnmic:
-   #  logging.info( f"Sending gNMI SET: {path} {config} {gnmic}" )
-   update_msg = []
-   for path,data in updates:
-     u_path = gnmi_path_generator( path )
-     u_val = bytes( json.dumps(data), 'utf-8' )
-     update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
-   update_request = SetRequest( update=update_msg )
-   try:
-         # Leaving out 'metadata' does return an error, so the call goes through
-         # It just doesn't show up in CLI (cached), logout+login fixes it
-         res = gnmi_stub.Set( update_request, metadata=gnmi_options )
-         logging.info( f"After gnmi.Set {updates}: {res}" )
-         return res
-   except grpc._channel._InactiveRpcError as err:
-         logging.error(err)
-         # May happen during system startup, retry once
-         if err.code() == grpc.StatusCode.FAILED_PRECONDITION:
-             logging.info("Exception during startup? Retry in 5s...")
-             time.sleep( 5 )
-             res = gnmi_stub.Set( update_request, metadata=gnmi_options )
-             logging.info(f"OK, success? {res}")
-             return res
-         raise err
-
-#
 # Runs as a separate thread
 #
 # Responsible for (re)starting FRR daemon(s) to update their config, and
@@ -264,14 +165,138 @@ class MonitoringThread(Thread):
        # Check that gNMI is connected now
        grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
+   def gNMI_Set( self, updates ):
+      #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+      #                       username="admin",password="admin",
+      #                       insecure=True, debug=True) as gnmic:
+      #  logging.info( f"Sending gNMI SET: {path} {config} {gnmic}" )
+      update_msg = []
+      for path,data in updates:
+        u_path = gnmi_path_generator( path )
+        u_val = bytes( json.dumps(data), 'utf-8' )
+        update_msg.append(Update(path=u_path, val=TypedValue(json_ietf_val=u_val)))
+      update_request = SetRequest( update=update_msg )
+      try:
+            # Leaving out 'metadata' does return an error, so the call goes through
+            # It just doesn't show up in CLI (cached), logout+login fixes it
+            res = self.gnmi_stub.Set( update_request, metadata=gnmi_options )
+            logging.info( f"After gnmi.Set {updates}: {res}" )
+            return res
+      except grpc._channel._InactiveRpcError as err:
+            logging.error(err)
+            # May happen during system startup, retry once
+            if err.code() == grpc.StatusCode.FAILED_PRECONDITION:
+                logging.info("Exception during startup? Retry in 5s...")
+                time.sleep( 5 )
+                res = self.gnmi_stub.Set( update_request, metadata=gnmi_options )
+                logging.info(f"OK, success? {res}")
+                return res
+            raise err
+
    #
    # Configure 'linux' protocol in given namespace, to import FRR routes
    # - no ECMP
    # - IPv4 next hops are invalid, only works for IPv6
    #
-   def ConfigureLinuxRouteImport( self, gnmi_stub ):
+   def ConfigureLinuxRouteImport( self ):
        path = f"/network-instance[name={self.net_inst}]/protocols/linux"
-       gNMI_Set( gnmi_stub, updates=[(path,{ 'import-routes' : True })] )
+       return self.gNMI_Set( updates=[(path,{ 'import-routes' : True })] )
+
+   def ConfigureIPv4UsingIPv6Nexthops( self ):
+       path = f"/network-instance[name={self.net_inst}]/ip-forwarding"
+       return self.gNMI_Set( updates=[(path,{ 'receive-ipv4-check': False } )] )
+
+   #
+   # Statically configures an IPv6 address on the given interface
+   #
+   # IPv4: for local resolution to the nexthop MAC, now removed
+   # IPv6: SRL does not support using link local IPv6 address as next hop
+   #
+   def ConfigurePeerIPMAC( self, intf, local_ip, peer_ip, mac, local_v6, ni_config ):
+      logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
+      phys_sub = intf.split('.') # e.g. e1-1.0 => ethernet-1/1.0
+      base_if = phys_sub[0].replace('-','/').replace('e',"ethernet-")
+
+      #
+      # Calculate pair of /31 IPs for given interface (e.g. e1-1 => peerlinks[0])
+      #
+      def GetLinkLocalIPs( phys_intf, link_local_range ):
+          peerlinks = list(ipaddress.ip_network(link_local_range).subnets(new_prefix=31))
+          peer_link = peerlinks[ int(phys_intf.split('-')[1]) - 1 ]
+          return list( map( str, peer_link.hosts() ) )
+
+      # Calculates a /127 to use in fc00::/7 private space, based on node IDs
+      # See RFC4193 https://datatracker.ietf.org/doc/html/rfc4193
+      def CalcIPv6LinkIPs():
+         lo_ip = min( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+         hi_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+         lo = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(lo_ip).split('.')))
+         hi = '{:02X}{:02X}:{:02X}{:02X}'.format(*map(int, str(hi_ip).split('.')))
+         # Local private ipv6 address based on RFC4193, generated from both router IDs
+         # Use 2 * last octet of smaller router ID as unique link distinguisher
+         # On cSRL MACs start with :01 on e1-1, but this may not be universal -> no -1
+         link_octet = int( (local_v6 if local_ip == str(lo_ip) else mac).split(':')[-1], 16 )
+         private_v6 = ipaddress.ip_address( f"fd00:{hi}:{lo}::{(2*link_octet):x}" )
+         logging.info( f"ConfigurePeerIPMAC selecting private RFC4193 IPv6: {private_v6}" )
+         v6_subnet = ipaddress.ip_network( str(private_v6) + '/127', strict=False )
+         i6 = list( map( str, v6_subnet.hosts() ) )
+         return ( i6[0], i6[1] ) if local_ip == str(lo_ip) else ( i6[1], i6[0] )
+
+      # intip = int(router_id)
+      # last_octet = (intip % 256)
+      #  ip2 = intip + last_octet # Double last octet, may overflow into next
+      #  return ipaddress.ip_address( ip2 )
+
+      # For IPv6, build a /127 based on mapped ipv4 of  2 * highest ID
+      # (assuming leaves have higher IDs than spines)
+      # highest_ip = max( ipaddress.ip_address(local_ip),ipaddress.ip_address(peer_ip) )
+      # ip31 = str( ShiftIP(highest_ip) ) # Create room for /31
+      # mapped_v4 = '::ffff:' + ip31 # Or 'regular' v6: '2001::ffff:'
+      # v6_subnet = ipaddress.ip_network( mapped_v4 + '/127', strict=False )
+      # v6_ips = list( map( str, v6_subnet.hosts() ) )
+      local_v6, peer_v6 = CalcIPv6LinkIPs()
+      logging.info( f"ConfigurePeerIPMAC local[v6]={local_v6} peer[v6]={peer_v6}" )
+
+      path = f'/interface[name={base_if}]/subinterface[index={phys_sub[1]}]'
+      desc = f"auto-configured by SRL FRR agent peer={peer_ip}"
+      config = {
+        "admin-state" : "enable",
+        "description" : desc,
+        "ipv6" : {
+          "address" : [
+             { "ip-prefix" : local_v6 + "/127",
+               "primary": '[null]'  # type 'empty'
+             }
+             # Could configure a static MAC here too, but better to use default mechanisms
+          ],
+          "router-advertisement": { "router-role": { "admin-state": "disable" } }
+        }
+      }
+      updates=[ (path, config) ]
+
+      if ni_config["use_ipv6_nexthops_for_ipv4"]:
+          self.gNMI_Set( updates=updates )
+          return peer_v6
+      else:
+          ips = GetLinkLocalIPs( phys_sub[0], "192.0.0.0/24" )
+          config['ipv4'] = {
+             "address" : [
+                { "ip-prefix" : ips[ 0 ] + "/31",
+                  "primary": '[null]'  # type 'empty'
+                }
+             ],
+             "arp" : {
+                "duplicate-address-detection" : False, # Need to disable DAD
+                "neighbor": [
+                  {
+                    "ipv4-address": ips[ 1 ],
+                    "link-layer-address": mac, # Because dynamic ARP wont work
+                    "_annotate_link-layer-address": desc
+                  }
+                ]
+             }
+          }
+          return ips[1] # ipv4 nexthop
 
    #
    # Called by another thread to wake up this one
@@ -301,7 +326,7 @@ class MonitoringThread(Thread):
       cfg = ni['config']
 
       # Create per-thread gNMI stub, using a global channel
-      gnmi_stub = gNMIStub( gnmi_channel )
+      self.gnmi_stub = gNMIStub( gnmi_channel )
 
       # Create Prefix manager, this starts listening to netlink route events
       if cfg['route_import'] == "ndk":
@@ -309,7 +334,11 @@ class MonitoringThread(Thread):
         self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata,
                                          int(cfg['bgp_preference']) )
       else:
-        self.ConfigureLinuxRouteImport( gnmi_stub )
+        self.ConfigureLinuxRouteImport()
+
+      if cfg['use_ipv6_nexthops_for_ipv4']:
+          # Could combine gNMI calls
+          self.ConfigureIPv4UsingIPv6Nexthops()
 
       # moved to auto-config agent
       # ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub )
@@ -355,13 +384,12 @@ class MonitoringThread(Thread):
                           # dont have the MAC address, but can derive it from ipv6 link local
                           mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
                           logging.info( f"{neighbor} MAC={mac}" )
-                          peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, gnmi_stub )
-                          # peer_v6 += "/127"
+                          peer_nh = self.ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, cfg )
                       else:
-                          peer_v6 = neighbor # + "/64"
+                          peer_nh = neighbor # /64 link-local ipv6 address
 
                       if hasattr(self,'prefix_mgr'):
-                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_v6 )
+                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_nh )
                       self.todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={self.todo}" )
                       continue
@@ -469,6 +497,7 @@ def Handle_Notification(obj, state):
                     params[ "bgp_preference" ] = bgp['preference']['value']
                     params[ "route_import" ] = bgp['route_import'][13:]
                     params[ "assign_static_ipv6" ] = bgp['assign_static_ipv6']['value']
+                    params[ "use_ipv6_nexthops_for_ipv4" ] = bgp['use_ipv6_nexthops_for_ipv4']['value']
 
                 if 'eigrp' in data:
                     eigrp = data['eigrp']

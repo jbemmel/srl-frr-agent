@@ -22,7 +22,7 @@ class PrefixManager:
         self.metadata = metadata  # Credentials for API access
         self.preference = pref    # Route preference from config
         self.oif_2_interface = {} # Map of oif to resolved interface name
-        self.nhg_2_peer_ipv6s = {} # NHG name to ipv6 nexthop address(es)
+        self.nhg_2_peer_nh_ips = {} # NHG name to ipv6 nexthop address(es)
         self.unresolved_ecmp_groups = {} # ECMP routes, key=oif bitmask
         self.pending_routes = {} # Map of unresolved routes, per interface index
 
@@ -99,10 +99,10 @@ class PrefixManager:
            nhg_name = f"ecmp-{oif_mask:x}"
            if unresolved_oifs==[]:
                resolved_nhg = nhg_name
-               if nhg_name not in self.nhg_2_peer_ipv6s:
+               if nhg_name not in self.nhg_2_peer_nh_ips:
                    self.create_ecmp_nhg( nhg_name, oifs )
                else:
-                   logging.info( f"ECMP NHG: {self.nhg_2_peer_ipv6s[nhg_name]}")
+                   logging.info( f"ECMP NHG: {self.nhg_2_peer_nh_ips[nhg_name]}")
 
                # Test: remove any individual routes before installing ECMP route
                # Should not be needed, addorupdate can update NHG
@@ -200,25 +200,25 @@ class PrefixManager:
         """
         Creates a new ECMP NHG, and resolves any pending routes
         """
-        assert( nhg_name not in self.nhg_2_peer_ipv6s )
+        assert( nhg_name not in self.nhg_2_peer_nh_ips )
         logging.info( f"create_ecmp_nhg {nhg_name} oifs={oifs}" )
-        nhg_ipv6s = {}
+        nhg_ips = {}
         for oif in oifs:
            ifname = self.oif_2_interface[oif]
-           ipv6 = list(self.nhg_2_peer_ipv6s[ifname].keys())[0]
-           nhg_ipv6s[ipv6] = oif
-        self.nhg_2_peer_ipv6s[nhg_name] = nhg_ipv6s
+           ipv6 = list(self.nhg_2_peer_nh_ips[ifname].keys())[0]
+           nhg_ips[ipv6] = oif
+        self.nhg_2_peer_nh_ips[nhg_name] = nhg_ips
         self.NDK_AddOrUpdateNextHopGroup( nhg_name )
         self.resolve_pending_routes( nhg_name, nhg_name )
 
-    def onInterfaceBGPv6Connected(self,interface,peer_ipv6):
+    def onInterfaceBGPv6Connected(self,interface,peer_nh):
         """
         Called when FRR BGP unnumbered ipv6 session comes up
         """
-        logging.info( f"onInterfaceBGPv6Connected {interface} {peer_ipv6}" )
+        logging.info( f"onInterfaceBGPv6Connected {interface} {peer_nh}" )
         intf_index = self.ipdb.interfaces[interface]['index'] # == netlink 'oif'
         self.oif_2_interface[intf_index] = interface
-        self.nhg_2_peer_ipv6s[interface] = { peer_ipv6: intf_index }
+        self.nhg_2_peer_nh_ips[interface] = { peer_nh: intf_index }
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
         # Also update any ECMP groups that this interface belongs to
@@ -246,8 +246,8 @@ class PrefixManager:
         nhg_info.key.network_instance_name = self.network_instance
         nhg_info.key.name = nhg_name( groupname )
 
-        assert( groupname in self.nhg_2_peer_ipv6s )
-        for ipv6_nexthop in sorted(self.nhg_2_peer_ipv6s[groupname].keys()):
+        assert( groupname in self.nhg_2_peer_nh_ips )
+        for ipv6_nexthop in sorted(self.nhg_2_peer_nh_ips[groupname].keys()):
           nh = nhg_info.data.next_hop.add()
           # 'linux' mgr uses 'DIRECT' resolution for ipv6 link locals
           nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT # LOCAL, DIRECT
