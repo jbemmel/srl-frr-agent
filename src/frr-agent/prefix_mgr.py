@@ -72,11 +72,20 @@ class PrefixManager:
        prefix = netlink_msg['attrs'][1][1] # RTA_DST
        length = netlink_msg['dst_len']
        # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
-       # version = "v6" # if netlink_msg['family'] == 10 or not use_v4 else "v4"
+       # version = "v6" if netlink_msg['family'] == 10 else "v4"
+
+       # DEBUG: Ignore v4 routes
+       # if version=="v6":
+       #   logging.info( f"JvB: ignoring v6 route: {prefix}/{length}" )
+       #   return
 
        att4 = netlink_msg['attrs'][4]
        resolved_nhg = None
        if att4[0] == "RTA_MULTIPATH": # Handle ECMP routes
+
+           # logging.info( f"JvB: ignoring v4 ecmp route: {prefix}/{length}" )
+           # return
+
            # Calculate bitmasked OR of interface indices
            oif_mask = 0
            unresolved_oifs = []
@@ -204,7 +213,7 @@ class PrefixManager:
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
         # Also update any ECMP groups that this interface belongs to
-        for nhg_name in self.unresolved_ecmp_groups.keys():
+        for nhg_name in list(self.unresolved_ecmp_groups.keys()):
             oifs, unresolved_oifs = self.unresolved_ecmp_groups[nhg_name]
             if intf_index in unresolved_oifs:
                if len(unresolved_oifs)==1:

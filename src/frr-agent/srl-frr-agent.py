@@ -84,6 +84,27 @@ def Subscribe_Notifications(stream_id):
     # Subscribe(stream_id, 'nexthop_group')
 
 #
+# Avoids a crash in BGP mgr by rejecting ipv4 routes on import
+#
+def ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub ):
+
+    reject_ipv4 = {
+      "default-action": { "accept": { } },
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": { "family": "srl_nokia-common:ipv4-unicast" },
+          "action": { "reject": { } }
+        }
+      ]
+    }
+    imp_policy = { 'import-policy' : "reject-ipv4" }
+    updates = [ ( '/routing-policy/policy[name=reject-ipv4]', reject_ipv4 ),
+                ( '/network-instance[name=default]/protocols/bgp', imp_policy )
+              ]
+    gNMI_Set( gnmi_stub, updates=updates )
+
+#
 # Uses gNMI to get /platform/chassis/mac-address and format as hhhh.hhhh.hhhh
 #
 def GetSystemMAC():
@@ -181,8 +202,13 @@ def ConfigurePeerIPMAC( intf, local_ip, peer_ip, mac, local_v6, gnmi_stub ):
    }
    updates=[ (path, config),
              # XXX hardcoded default network instance
-             ('/network-instance[name=default]/ip-forwarding',
-              { 'receive-ipv4-check': False } ) ]
+             ('/network-instance[name=default]/ip-forwarding', { 'receive-ipv4-check': False } ),
+             # ('/network-instance[name=default]/protocols/bgp/ipv4-unicast',
+             # { 'admin-state': 'disable' } ), # Avoid BGP mgr crash
+             #('/network-instance[name=default]/protocols/bgp/ipv6-unicast',
+             # { 'admin-state': 'enable' } ),  # At least 1 family must be enabled
+             # { 'advertise-ipv6-next-hops': True, 'receive-ipv6-next-hops': True, } ),
+           ]
 
    gNMI_Set( gnmi_stub, updates=updates )
    return peer_v6
@@ -272,6 +298,9 @@ class MonitoringThread(Thread):
 
       # Create per-thread gNMI stub, using a global channel
       gnmi_stub = gNMIStub( gnmi_channel )
+
+      # moved to auto-config agent
+      # ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub )
 
       def add_interface_to_config(i):
         """
