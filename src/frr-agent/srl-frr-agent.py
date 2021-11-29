@@ -380,7 +380,7 @@ class MonitoringThread(Thread):
                       localV6 = i['hostLocal']
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      if cfg['assign_static_ipv6']:
+                      if cfg['assign_static_ipv6'] or not cfg['use_ipv6_nexthops_for_ipv4']:
                           # dont have the MAC address, but can derive it from ipv6 link local
                           mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
                           logging.info( f"{neighbor} MAC={mac}" )
