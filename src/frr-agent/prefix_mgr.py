@@ -219,7 +219,7 @@ class PrefixManager:
         logging.info( f"onInterfaceBGPv6Connected {interface} {peer_nhs}" )
         intf_index = self.ipdb.interfaces[interface]['index'] # == netlink 'oif'
         self.oif_2_interface[intf_index] = interface
-        self.nhg_2_peer_nh_ips[interface] = peer_nhs  # (v4,v6)
+        self.nhg_2_peer_nh_ips[interface] = { peer_nhs: intf_index }  # (v4,v6)
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
         # Also update any ECMP groups that this interface belongs to
