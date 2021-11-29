@@ -109,7 +109,7 @@ class PrefixManager:
            if oif in self.oif_2_interface:
                resolved_nhg = self.oif_2_interface[oif]
 
-       logging.info( f"add_Route {prefix}/{length} resolved_nhg={resolved_nhg}")
+       logging.info( f"add_Route {prefix}/{length} oif={oif} resolved_nhg={resolved_nhg}")
 
        # Check if the interface has been resolved, if not add to pending list
        route = [ (prefix, length) ]
@@ -120,7 +120,7 @@ class PrefixManager:
                self.pending_routes[oif] += route
            else:
                self.pending_routes[oif] = route
-               logging.info( f"Route added to pending routes: {self.pending_routes}" )
+           logging.info( f"add_Route added to pending routes: {self.pending_routes}" )
 
     def NDK_AddRoutes(self,interface,routes):
         """
