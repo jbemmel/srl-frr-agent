@@ -64,13 +64,15 @@ class PrefixManager:
            else:
               logging.info( f"netlink_callback: Ignoring BGP action {action}" )
          else:
-            logging.debug( f"netlink_callback: Ignoring {action}" )
+            logging.info( f"netlink_callback: Ignoring {action}" )
 
       self.ipdb.register_callback(netlink_callback)
 
     def add_Route( self, netlink_msg ):
        prefix = netlink_msg['attrs'][1][1] # RTA_DST
        length = netlink_msg['dst_len']
+       route = [ (prefix, length) ]
+
        # metric = netlink_msg['attrs'][2][1] # RTA_priority -> metric ?
        # version = "v6" if netlink_msg['family'] == 10 else "v4"
 
@@ -101,6 +103,10 @@ class PrefixManager:
                    self.create_ecmp_nhg( nhg_name, oifs )
                else:
                    logging.info( f"ECMP NHG: {self.nhg_2_peer_ipv6s[nhg_name]}")
+
+               # Test: remove any individual routes before installing ECMP route
+               logging.info( f"add_Route {prefix}/{length} removing any single routes before adding ECMP route" )
+               self.NDK_DeleteRoutes( route )
            else:
                oif = nhg_name # Used as key in pending_routes
                self.unresolved_ecmp_groups[nhg_name] = (oifs, unresolved_oifs)
@@ -112,7 +118,6 @@ class PrefixManager:
        logging.info( f"add_Route {prefix}/{length} oif={oif} resolved_nhg={resolved_nhg}")
 
        # Check if the interface has been resolved, if not add to pending list
-       route = [ (prefix, length) ]
        if resolved_nhg:
            self.NDK_AddRoutes(resolved_nhg,routes=route)
        else:
@@ -240,9 +245,11 @@ class PrefixManager:
         assert( groupname in self.nhg_2_peer_ipv6s )
         for ipv6_nexthop in sorted(self.nhg_2_peer_ipv6s[groupname].keys()):
           nh = nhg_info.data.next_hop.add()
-          nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT
-          nh.type = ndk_nhg_pb2.NextHop.REGULAR
+          # 'linux' mgr uses 'DIRECT' resolution for ipv6 link locals
+          nh.resolve_to = ndk_nhg_pb2.NextHop.DIRECT # LOCAL, INDIRECT
+          nh.type = ndk_nhg_pb2.NextHop.REGULAR # INVALID, MPLS
           nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
+          logging.info(f"NextHopGroupAddOrUpdate :: added {ipv6_nexthop} (DIRECT)" )
 
         logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
         nhg_stub = ndk_nhg_grpc.SdkMgrNextHopGroupServiceStub(self.channel)

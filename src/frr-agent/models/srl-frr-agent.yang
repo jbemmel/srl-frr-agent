@@ -83,9 +83,9 @@ module srl-frr-agent {
               }
 
               leaf assign-static-ipv6 {
-                description "Flag to assign static IPv6 addresses from RFC4193, default use auto-assigned link-local";
+                description "Flag to assign static IPv6 addresses from RFC4193, if not use auto-assigned link-local";
                 type boolean;
-                default false;
+                default true; // For some reason we cannot create ipv6 link-local nexthops via NDK
               }
 
               leaf route-import {
