@@ -594,7 +594,7 @@ def script_update_frr(**kwargs):
     logging.info(f'Calling manage-frr script: params={kwargs}' )
 
     try:
-       my_env = {**os.environ, **kwargs}
+       my_env = {**os.environ, **{ k:str(v) for (k,v) in kwargs } }
        script_proc = subprocess.Popen(['scripts/manage-frr.sh'],
                                        # preexec_fn=demote(frr_uid, frr_gid),
                                        env=my_env, # shell=False
