@@ -277,8 +277,7 @@ class MonitoringThread(Thread):
       updates=[ (path, config) ]
 
       if ni_config["use_ipv6_nexthops_for_ipv4"]:
-          self.gNMI_Set( updates=updates )
-          return (None,peer_v6)
+          result = (None,peer_v6)
       else:
           ips = GetLinkLocalIPs( phys_sub[0], "192.0.0.0/24" )
           config['ipv4'] = {
@@ -298,7 +297,10 @@ class MonitoringThread(Thread):
                 ]
              }
           }
-          return ( ips[1], peer_v6 ) # ipv4+ipv6 nexthops
+          result = ( ips[1], peer_v6 ) # ipv4+ipv6 nexthops
+
+      self.gNMI_Set( updates=updates )
+      return result
 
    #
    # Called by another thread to wake up this one

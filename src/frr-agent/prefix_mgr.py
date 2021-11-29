@@ -5,7 +5,7 @@ from sdk_protos import route_service_pb2,route_service_pb2_grpc
 from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2
 from sdk_protos import nexthop_group_service_pb2_grpc as ndk_nhg_grpc
 
-def nhg_name(interface,v4=False):
+def NHG_name(interface,v4=False):
     return f"bgpu_{'v4_' if v4 else ''}{interface}_sdk" # Must end with _sdk
 
 class PrefixManager:
@@ -64,7 +64,7 @@ class PrefixManager:
            else:
               logging.info( f"netlink_callback: Ignoring BGP action {action}" )
          else:
-            logging.info( f"netlink_callback: Ignoring {action}" )
+            logging.debug( f"netlink_callback: Ignoring {action}" )
 
       self.ipdb.register_callback(netlink_callback)
 
@@ -139,7 +139,7 @@ class PrefixManager:
         route_request = route_service_pb2.RouteAddRequest()
         for prefix,prefix_length in routes:
             route_info = route_request.routes.add()
-            route_info.data.preference = self.config['bgp_preference']
+            route_info.data.preference = int( self.config['bgp_preference'] )
 
             # Could configure defaults for these in the agent Yang params
             # route_info.data.metric = ip['metric']
@@ -154,7 +154,7 @@ class PrefixManager:
             # nexthop = route_info.nexthop.add()
             #
             use_v6 = self.config['use_ipv6_nexthops_for_ipv4'] or ip.version==6
-            route_info.data.nexthop_group_name = nhg_name( interface, not use_v6 )
+            route_info.data.nexthop_group_name = NHG_name( interface, not use_v6 )
 
         logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
         route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(self.channel)
@@ -245,7 +245,7 @@ class PrefixManager:
 
         nhg_info = nh_request.group_info.add()
         nhg_info.key.network_instance_name = self.network_instance
-        nhg_info.key.name = nhg_name( groupname, do_v4 )
+        nhg_info.key.name = NHG_name( groupname, do_v4 )
 
         assert( groupname in self.nhg_2_peer_nh_ips )
         v4_valid = False

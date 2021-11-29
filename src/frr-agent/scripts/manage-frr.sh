@@ -121,7 +121,11 @@ router bgp $autonomous_system
  exit-address-family
  !
 !
-route-map drop_link_routes_v4 permit 10
+ip prefix-list link_local_v4 seq 5 permit 192.0.0.0/24 ge 31 le 32
+route-map drop_link_routes_v4 deny 10
+ match ip address prefix-list link_local_v4
+!
+route-map drop_link_routes_v4 permit 20
 !
 ipv6 prefix-list link_local_v6 seq 5 permit fd00::/16 ge 127 le 128
 !
