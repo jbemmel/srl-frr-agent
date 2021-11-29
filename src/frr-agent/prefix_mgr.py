@@ -250,10 +250,10 @@ class PrefixManager:
         for ipv6_nexthop in sorted(self.nhg_2_peer_ipv6s[groupname].keys()):
           nh = nhg_info.data.next_hop.add()
           # 'linux' mgr uses 'DIRECT' resolution for ipv6 link locals
-          nh.resolve_to = ndk_nhg_pb2.NextHop.DIRECT # LOCAL, INDIRECT
+          nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT # LOCAL, DIRECT
           nh.type = ndk_nhg_pb2.NextHop.REGULAR # INVALID, MPLS
           nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
-          logging.info(f"NextHopGroupAddOrUpdate :: added {ipv6_nexthop} (DIRECT)" )
+          logging.info(f"NextHopGroupAddOrUpdate :: added {ipv6_nexthop} (INDIRECT)" )
 
         logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
         nhg_stub = ndk_nhg_grpc.SdkMgrNextHopGroupServiceStub(self.channel)
