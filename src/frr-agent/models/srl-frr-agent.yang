@@ -81,6 +81,19 @@ module srl-frr-agent {
                 type uint8;
                 default 170;
               }
+
+              leaf route-import {
+                description "Selects the route import mechanism";
+                type enumeration {
+                  enum ndk {
+                    description "Use the SRL NDK to import ipv4/v6 routes from FRR";
+                  }
+                  enum linux {
+                    description "Use the built-in 'linux' protocol to import routes";
+                  }
+                }
+                default "ndk";
+              }
             }
             container eigrp {
               presence "Configure EIGRP";

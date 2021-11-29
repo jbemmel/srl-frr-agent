@@ -265,6 +265,13 @@ class MonitoringThread(Thread):
        grpc.channel_ready_future(gnmi_channel).result(timeout=5)
 
    #
+   # Configure 'linux' protocol in given namespace, to import FRR routes
+   #
+   def ConfigureLinuxRouteImport( self, gnmi_stub ):
+       path = f"/network-instance[name={self.net_inst}]/protocols/linux"
+       gNMI_Set( gnmi_stub, updates=[(path,{ 'import-routes' : True })] )
+
+   #
    # Called by another thread to wake up this one
    #
    def CheckForUpdatedInterfaces(self):
@@ -291,13 +298,16 @@ class MonitoringThread(Thread):
       ni = self.state.network_instances[ self.net_inst ]
       cfg = ni['config']
 
-      # Create Prefix manager, this starts listening to netlink route events
-      from prefix_mgr import PrefixManager
-      self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata,
-                                       int(cfg['bgp_preference']) )
-
       # Create per-thread gNMI stub, using a global channel
       gnmi_stub = gNMIStub( gnmi_channel )
+
+      # Create Prefix manager, this starts listening to netlink route events
+      if cfg['route_import'] == "ndk":
+        from prefix_mgr import PrefixManager
+        self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata,
+                                         int(cfg['bgp_preference']) )
+      else:
+        self.ConfigureLinuxRouteImport( gnmi_stub )
 
       # moved to auto-config agent
       # ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub )
@@ -344,7 +354,8 @@ class MonitoringThread(Thread):
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
                       peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, gnmi_stub )
 
-                      self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_v6 )
+                      if hasattr(self,'prefix_mgr'):
+                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_v6 )
                       self.todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={self.todo}" )
                       continue
@@ -450,6 +461,7 @@ def Handle_Notification(obj, state):
                     params[ "frr_bgpd_port" ] = bgp['port']['value'] if 'port' in bgp else "1179"
                     # params[ "bgp_link_local_range" ] = bgp['link_local_range']['value']
                     params[ "bgp_preference" ] = bgp['preference']['value']
+                    params[ "route_import" ] = bgp['route_import'][13:]
 
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
