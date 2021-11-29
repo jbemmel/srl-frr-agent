@@ -82,6 +82,12 @@ module srl-frr-agent {
                 default 170;
               }
 
+              leaf assign-static-ipv6 {
+                description "Flag to assign static IPv6 addresses from RFC4193, default use auto-assigned link-local";
+                type boolean;
+                default false;
+              }
+
               leaf route-import {
                 description "Selects the route import mechanism";
                 type enumeration {

@@ -266,6 +266,8 @@ class MonitoringThread(Thread):
 
    #
    # Configure 'linux' protocol in given namespace, to import FRR routes
+   # - no ECMP
+   # - IPv4 next hops are invalid, only works for IPv6
    #
    def ConfigureLinuxRouteImport( self, gnmi_stub ):
        path = f"/network-instance[name={self.net_inst}]/protocols/linux"
@@ -341,18 +343,22 @@ class MonitoringThread(Thread):
                 _js = json.loads( json_data )
                 if _i in _js:
                    i = _js[ _i ]
-                   neighbor = i['bgpNeighborAddr'] #ipv6 link-local
+                   neighbor = i['bgpNeighborAddr'] # ipv6 link-local
                    localId = i['localRouterId']
                    peerId = i['remoteRouterId']
                    if neighbor!="none" and peerId!="0.0.0.0":
-                      logging.info( f"Peer UP - data from FRR:\n{i}" )
+                      logging.info( f"Peer {peerId} UP - data from FRR:\n{i}" )
                       localV6 = i['hostLocal']
-                      # dont have the MAC address, but can derive it from ipv6 link local
-                      mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
-                      logging.info( f"{neighbor} MAC={mac}" )
                       logging.info( f"localAs={i['localAs']} remoteAs={i['remoteAs']}" )
                       logging.info( f"id={peerId} name={i['hostname'] if 'hostname' in i else '?'}" )
-                      peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, gnmi_stub )
+                      if cfg['assign_static_ipv6']:
+                          # dont have the MAC address, but can derive it from ipv6 link local
+                          mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
+                          logging.info( f"{neighbor} MAC={mac}" )
+                          peer_v6 = ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, gnmi_stub )
+                          # peer_v6 += "/127"
+                      else:
+                          peer_v6 = neighbor # + "/64"
 
                       if hasattr(self,'prefix_mgr'):
                          self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_v6 )
@@ -462,6 +468,7 @@ def Handle_Notification(obj, state):
                     # params[ "bgp_link_local_range" ] = bgp['link_local_range']['value']
                     params[ "bgp_preference" ] = bgp['preference']['value']
                     params[ "route_import" ] = bgp['route_import'][13:]
+                    params[ "assign_static_ipv6" ] = bgp['assign_static_ipv6']['value']
 
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
