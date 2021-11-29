@@ -95,10 +95,10 @@ module srl-frr-agent {
                     description "Use the SRL NDK to import ipv4/v6 routes from FRR";
                   }
                   enum linux {
-                    description "Use the built-in 'linux' protocol to import routes";
+                    description "Use the built-in 'linux' protocol to import routes; ipv6 only and no ECMP";
                   }
                 }
-                default "linux";
+                default "ndk";
               }
             }
             container eigrp {
