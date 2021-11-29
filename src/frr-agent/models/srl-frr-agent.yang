@@ -92,7 +92,7 @@ module srl-frr-agent {
                     description "Use the built-in 'linux' protocol to import routes";
                   }
                 }
-                default "ndk";
+                default "linux";
               }
             }
             container eigrp {
