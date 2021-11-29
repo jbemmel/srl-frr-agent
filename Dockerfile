@@ -41,9 +41,10 @@ COPY ./src /opt/demo-agents/
 # Add in auto-config agent sources too
 COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
 
-# Stop BGP mgr from crashing (causes ipv4 prefix to be read as 16 ipv6 bytes)
+# Stop BGP mgr from crashing (change jump location to ignore "bad" ipv4 prefix)
 # Find offset: LANG=C grep -obUaP "\x75\x43\x48\x85\xc9\x0f\x84\xd2\x00\x00\x00" /opt/srlinux/bin/sr_bgp_mgr => 6751939 + 5 = 6751944
-RUN printf '\x90\x90\x90\x90\x90\x90' | sudo dd of=/opt/srlinux/bin/sr_bgp_mgr bs=1 seek=6751944 count=6 conv=notrunc
+# This breaks BGP connections too
+# RUN printf '\x2a' | sudo dd of=/opt/srlinux/bin/sr_bgp_mgr bs=1 seek=6751946 count=1 conv=notrunc
 
 # run pylint to catch any obvious errors
 RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/frr-agent
