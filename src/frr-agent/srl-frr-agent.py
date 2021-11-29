@@ -210,7 +210,9 @@ class MonitoringThread(Thread):
    # Statically configures an IPv6 address on the given interface
    #
    # IPv4: for local resolution to the nexthop MAC, now removed
-   # IPv6: SRL does not support using link local IPv6 address as next hop
+   # IPv6: SRL NDK does not support using link local IPv6 address as next hop
+   #
+   # Returns (ipv4,ipv6) nexthop addresses for peer
    #
    def ConfigurePeerIPMAC( self, intf, local_ip, peer_ip, mac, local_v6, ni_config ):
       logging.info( f"ConfigurePeerIPMAC on {intf}: ip={peer_ip} mac={mac} local_ip={local_ip}" )
@@ -276,7 +278,7 @@ class MonitoringThread(Thread):
 
       if ni_config["use_ipv6_nexthops_for_ipv4"]:
           self.gNMI_Set( updates=updates )
-          return peer_v6
+          return (None,peer_v6)
       else:
           ips = GetLinkLocalIPs( phys_sub[0], "192.0.0.0/24" )
           config['ipv4'] = {
@@ -296,7 +298,7 @@ class MonitoringThread(Thread):
                 ]
              }
           }
-          return ips[1] # ipv4 nexthop
+          return ( ips[1], peer_v6 ) # ipv4+ipv6 nexthops
 
    #
    # Called by another thread to wake up this one
@@ -331,8 +333,7 @@ class MonitoringThread(Thread):
       # Create Prefix manager, this starts listening to netlink route events
       if cfg['route_import'] == "ndk":
         from prefix_mgr import PrefixManager
-        self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata,
-                                         int(cfg['bgp_preference']) )
+        self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata, cfg )
       else:
         self.ConfigureLinuxRouteImport()
 
@@ -384,12 +385,12 @@ class MonitoringThread(Thread):
                           # dont have the MAC address, but can derive it from ipv6 link local
                           mac = ipv6_2_mac(neighbor) # XXX not ideal, may differ
                           logging.info( f"{neighbor} MAC={mac}" )
-                          peer_nh = self.ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, cfg )
+                          peer_nhs = self.ConfigurePeerIPMAC( _i, localId, peerId, mac, localV6, cfg )
                       else:
-                          peer_nh = neighbor # /64 link-local ipv6 address
+                          peer_nhs = (None,neighbor) # /64 link-local ipv6 address
 
                       if hasattr(self,'prefix_mgr'):
-                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_nh )
+                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_nhs )
                       self.todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={self.todo}" )
                       continue

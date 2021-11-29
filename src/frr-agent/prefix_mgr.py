@@ -5,8 +5,8 @@ from sdk_protos import route_service_pb2,route_service_pb2_grpc
 from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2
 from sdk_protos import nexthop_group_service_pb2_grpc as ndk_nhg_grpc
 
-def nhg_name(interface):
-    return "bgpu_" + interface + "_sdk" # Must end with _sdk
+def nhg_name(interface,v4=False):
+    return f"bgpu_{'v4_' if v4 else ''}{interface}_sdk" # Must end with _sdk
 
 class PrefixManager:
     """
@@ -16,13 +16,13 @@ class PrefixManager:
     so this class holds on to those prefixes until the nexthop is resolved
     (by FRR BGP unnumbered session coming online)
     """
-    def __init__(self,net_inst,gnmi_channel,metadata,pref):
+    def __init__(self,net_inst,gnmi_channel,metadata,config):
         self.network_instance = net_inst
         self.channel = gnmi_channel
         self.metadata = metadata  # Credentials for API access
-        self.preference = pref    # Route preference from config
+        self.config = config      # Settings for this network instance
         self.oif_2_interface = {} # Map of oif to resolved interface name
-        self.nhg_2_peer_nh_ips = {} # NHG name to ipv6 nexthop address(es)
+        self.nhg_2_peer_nh_ips = {} # NHG name to (v4,v6) nexthop address(es)
         self.unresolved_ecmp_groups = {} # ECMP routes, key=oif bitmask
         self.pending_routes = {} # Map of unresolved routes, per interface index
 
@@ -139,7 +139,7 @@ class PrefixManager:
         route_request = route_service_pb2.RouteAddRequest()
         for prefix,prefix_length in routes:
             route_info = route_request.routes.add()
-            route_info.data.preference = self.preference
+            route_info.data.preference = self.config['bgp_preference']
 
             # Could configure defaults for these in the agent Yang params
             # route_info.data.metric = ip['metric']
@@ -153,7 +153,8 @@ class PrefixManager:
             # SDK allows to either specify a NHG name, or a list of nexthop IPs
             # nexthop = route_info.nexthop.add()
             #
-            route_info.data.nexthop_group_name = nhg_name( interface )
+            use_v6 = self.config['use_ipv6_nexthops_for_ipv4'] or ip.version==6
+            route_info.data.nexthop_group_name = nhg_name( interface, not use_v6 )
 
         logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
         route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(self.channel)
@@ -205,20 +206,20 @@ class PrefixManager:
         nhg_ips = {}
         for oif in oifs:
            ifname = self.oif_2_interface[oif]
-           ipv6 = list(self.nhg_2_peer_nh_ips[ifname].keys())[0]
-           nhg_ips[ipv6] = oif
+           v4_v6_nh = list(self.nhg_2_peer_nh_ips[ifname].keys())[0]
+           nhg_ips[v4_v6_nh] = oif
         self.nhg_2_peer_nh_ips[nhg_name] = nhg_ips
         self.NDK_AddOrUpdateNextHopGroup( nhg_name )
         self.resolve_pending_routes( nhg_name, nhg_name )
 
-    def onInterfaceBGPv6Connected(self,interface,peer_nh):
+    def onInterfaceBGPv6Connected(self,interface,peer_nhs):
         """
         Called when FRR BGP unnumbered ipv6 session comes up
         """
-        logging.info( f"onInterfaceBGPv6Connected {interface} {peer_nh}" )
+        logging.info( f"onInterfaceBGPv6Connected {interface} {peer_nhs}" )
         intf_index = self.ipdb.interfaces[interface]['index'] # == netlink 'oif'
         self.oif_2_interface[intf_index] = interface
-        self.nhg_2_peer_nh_ips[interface] = { peer_nh: intf_index }
+        self.nhg_2_peer_nh_ips[interface] = peer_nhs  # (v4,v6)
         self.NDK_AddOrUpdateNextHopGroup( interface )
 
         # Also update any ECMP groups that this interface belongs to
@@ -238,22 +239,25 @@ class PrefixManager:
     # Creates or updates next hop group for a given (resolved) interface,
     # using the NDK
     #
-    def NDK_AddOrUpdateNextHopGroup( self, groupname ):
-        logging.info(f"NDK_AddOrUpdateNextHopGroup :: groupname={groupname}")
+    def NDK_AddOrUpdateNextHopGroup( self, groupname, do_v4=False ):
+        logging.info(f"NDK_AddOrUpdateNextHopGroup :: name={groupname} v4={do_v4}")
         nh_request = ndk_nhg_pb2.NextHopGroupRequest()
 
         nhg_info = nh_request.group_info.add()
         nhg_info.key.network_instance_name = self.network_instance
-        nhg_info.key.name = nhg_name( groupname )
+        nhg_info.key.name = nhg_name( groupname, do_v4 )
 
         assert( groupname in self.nhg_2_peer_nh_ips )
-        for ipv6_nexthop in sorted(self.nhg_2_peer_nh_ips[groupname].keys()):
+        v4_valid = False
+        for (v4_nh,v6_nh) in sorted(self.nhg_2_peer_nh_ips[groupname].keys()):
+          if v4_nh:
+              v4_valid = True
           nh = nhg_info.data.next_hop.add()
           # 'linux' mgr uses 'DIRECT' resolution for ipv6 link locals
           nh.resolve_to = ndk_nhg_pb2.NextHop.INDIRECT # LOCAL, DIRECT
-          nh.type = ndk_nhg_pb2.NextHop.INVALID # INVALID, MPLS, REGULAR
-          nh.ip_nexthop.addr = ipaddress.ip_address(ipv6_nexthop).packed
-          logging.info(f"NextHopGroupAddOrUpdate :: added {ipv6_nexthop} (INDIRECT)" )
+          nh.type = ndk_nhg_pb2.NextHop.REGULAR # INVALID, MPLS, REGULAR
+          nh.ip_nexthop.addr = ipaddress.ip_address(v4_nh if do_v4 else v6_nh).packed
+          logging.info(f"NextHopGroupAddOrUpdate :: added {v4_nh if do_v4 else v6_nh} (INDIRECT)" )
 
         logging.info(f"NextHopGroupAddOrUpdate :: {nh_request}")
         nhg_stub = ndk_nhg_grpc.SdkMgrNextHopGroupServiceStub(self.channel)
@@ -261,4 +265,9 @@ class PrefixManager:
                                                         metadata=self.metadata)
         logging.info(f"NextHopGroupAddOrUpdate :: status={nhg_response.status}"+
                                                 f"err={nhg_response.error_str}")
+
+        # Also create ipv4 variant, if valid
+        if v4_valid and not do_v4:
+            return self.NDK_AddOrUpdateNextHopGroup(groupname,do_v4=True)
+
         return nhg_response.status == 0
