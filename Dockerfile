@@ -46,8 +46,8 @@ COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
 # This breaks BGP connections too
 # RUN printf '\x2a' | sudo dd of=/opt/srlinux/bin/sr_bgp_mgr bs=1 seek=6751946 count=1 conv=notrunc
 
-# Modify BGP mgr config to auto-restart when crashed
-RUN sudo sed -i.orig -E '4 i \   failure-threshold: 20\n   failure-action: wait=5' /opt/srlinux/appmgr/sr_bgp_mgr_config.yml
+# Modify BGP mgr config to auto-restart when crashed, endless
+# RUN sudo sed -i.orig -E '4 i \   failure-threshold: 20\n   failure-action: wait=5' /opt/srlinux/appmgr/sr_bgp_mgr_config.yml
 
 # run pylint to catch any obvious errors
 RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/frr-agent

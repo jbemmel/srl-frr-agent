@@ -105,15 +105,19 @@ class PrefixManager:
                    logging.info( f"ECMP NHG: {self.nhg_2_peer_ipv6s[nhg_name]}")
 
                # Test: remove any individual routes before installing ECMP route
-               logging.info( f"add_Route {prefix}/{length} removing any single routes before adding ECMP route" )
-               self.NDK_DeleteRoutes( route )
+               # Should not be needed, addorupdate can update NHG
+               # logging.info( f"add_Route {prefix}/{length} removing any single routes before adding ECMP route" )
+               # self.NDK_DeleteRoutes( route )
            else:
                oif = nhg_name # Used as key in pending_routes
                self.unresolved_ecmp_groups[nhg_name] = (oifs, unresolved_oifs)
-       else:
+       else: # if version=="v6":
            oif = netlink_msg['attrs'][5][1] # RTA_OIF
            if oif in self.oif_2_interface:
                resolved_nhg = self.oif_2_interface[oif]
+       # else:
+       #   logging.info( "Workaround: Don't install single link ipv4 route {prefix}/{length}" )
+       #   return
 
        logging.info( f"add_Route {prefix}/{length} oif={oif} resolved_nhg={resolved_nhg}")
 
