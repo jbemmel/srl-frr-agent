@@ -42,9 +42,9 @@ COPY ./src /opt/demo-agents/
 COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
 
 # Stop BGP mgr from crashing (change jump location to ignore "bad" ipv4 prefix)
-# Find offset: LANG=C grep -obUaP "\x75\x43\x48\x85\xc9\x0f\x84\xd2\x00\x00\x00" /opt/srlinux/bin/sr_bgp_mgr => 6751939 + 5 = 6751944
-# This breaks BGP connections too
-# RUN printf '\x2a' | sudo dd of=/opt/srlinux/bin/sr_bgp_mgr bs=1 seek=6751946 count=1 conv=notrunc
+# Find offset: LANG=C grep -obUaP "\x75\x43\x48\x85\xc9\x0f\x84\xd2\x00\x00\x00" /opt/srlinux/bin/sr_bgp_mgr => 6751939 + 7 = 6751946
+# Change jump to what looks like a 4-byte ipv4 case? nope
+# RUN printf '\x6e' | sudo dd of=/opt/srlinux/bin/sr_bgp_mgr bs=1 seek=6751946 count=1 conv=notrunc
 
 # Modify BGP mgr config to auto-restart when crashed, endless
 # RUN sudo sed -i.orig -E '4 i \   failure-threshold: 20\n   failure-action: wait=5' /opt/srlinux/appmgr/sr_bgp_mgr_config.yml
