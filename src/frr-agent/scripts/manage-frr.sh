@@ -15,6 +15,7 @@ echo $admin_state
 echo $autonomous_system
 echo $router_id
 echo $bgp_neighbor_lines
+echo $anycast_nexthop
 echo $eigrp
 
 # Tried running eigrpd in 'srbase' netns -> unstable
@@ -88,6 +89,28 @@ else
 EIGRP_CONFIG="no router eigrp $autonomous_system"
 fi
 
+if [[ "$anycast_nexthop" != "" ]]; then
+
+IFS='' read -r -d '' ANYCAST_NEXTHOP_PEERGROUP_V4 << EOF
+neighbor ANYCAST_PEERS_V4 peer-group
+neighbor ANYCAST_PEERS_V4 remote-as external
+neighbor ANYCAST_PEERS_V4 disable-connected-check
+EOF
+
+ANYCAST_PEER_V4="neighbor ANYCAST_PEERS_V4 route-map set-anycast-nexthop-v4 in"
+
+IFS='' read -r -d '' ANYCAST_NEXTHOP_ROUTEMAP_V4 << EOF
+! Modify next-hop address (except for routes to the anycast ip itself)
+ip prefix-list anycast_ip seq 5 permit $anycast_nexthop/32 ge 32 le 32
+route-map set-anycast-nexthop-v4 permit 5
+ match ip address prefix-list anycast_ip
+!
+route-map set-anycast-nexthop-v4 permit 10
+ set ip next-hop $anycast_nexthop
+exit
+EOF
+fi
+
 if [[ "$bgp" == "enable" ]]; then
 
 IFS='' read -r -d '' BGP_CONFIG << EOF
@@ -100,8 +123,8 @@ router bgp $autonomous_system
  ! Only applies when there are 'networks' statements
  ! no bgp network import-check
 
- ! It's possible to define peer groups for scaling, not currently used
- ! neighbor V4 peer-group
+ ! It's possible to define peer groups for scaling
+ \${ANYCAST_NEXTHOP_PEERGROUP_V4}
 
  ! Both SRL and FRR are sending ipv6 neighbor discovery packets, should disable
  ! but https://github.com/FRRouting/frr/issues/7738 issue prevents that
@@ -114,6 +137,7 @@ router bgp $autonomous_system
  !
  address-family ipv4 unicast
   redistribute connected route-map drop_link_routes_v4
+  \${ANYCAST_PEER_V4}
  exit-address-family
  !
  address-family ipv6 unicast
@@ -133,6 +157,8 @@ route-map drop_link_routes_v6 deny 10
  match ipv6 address prefix-list link_local_v6
 !
 route-map drop_link_routes_v6 permit 20
+!
+\${ANYCAST_NEXTHOP_ROUTEMAP_V4}
 !
 EOF
 else

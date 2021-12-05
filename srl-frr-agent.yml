@@ -7,7 +7,8 @@ srl_frr_agent:
    failure-threshold: 3
    failure-action: wait=forever
    author: 'Nokia'
-   version-command: ' cat build_version'
+   # version-command: ' cat build_version'
+   version-command: 'echo "A broken heart is all Ive left..."'
    yang-modules:
        names:
            - "srl-frr-agent"

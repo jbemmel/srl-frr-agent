@@ -109,6 +109,12 @@ module srl-frr-agent {
                 }
                 default "ndk";
               }
+
+              // TODO: Accept 'magic' routes that denote anycast rewrite rules
+              leaf anycast-nexthop {
+                type srl_nokia-comm:ip-address;
+                description "Configure FRR to rewrite the nexthop with this anycast IP (presumably announced by BGP peers)";
+              }
             }
             container eigrp {
               presence "Configure EIGRP";
