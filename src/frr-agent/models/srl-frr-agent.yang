@@ -50,6 +50,10 @@ module srl-frr-agent {
                 type srl_nokia-comm:admin-state;
                 default "enable";
 
+                must ". = 'disable' or /system/gnmi-server/unix-socket/admin-state = 'enable'" {
+                 error-message "This agent requires the gNMI Unix socket to be enabled";
+                }
+
                 description
                     "Administratively enable or disable the entire FRR BGP instance
 
