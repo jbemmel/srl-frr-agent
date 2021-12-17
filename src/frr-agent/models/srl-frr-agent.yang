@@ -22,6 +22,10 @@ module srl-frr-agent {
         prefix srl_nokia-ext;
     }
 
+    import srl_nokia-bgp {
+        prefix srl_nokia-bgp;
+    }
+
     revision "2021-08-03" {
         description "Initial revision";
         reference "TBD";
@@ -119,6 +123,9 @@ module srl-frr-agent {
                 type srl_nokia-comm:ip-address;
                 description "Configure FRR to rewrite the nexthop with this anycast IP (presumably announced by BGP peers)";
               }
+
+              // Allow provisioning of BGP neighbors, using the native model
+              uses srl_nokia-bgp:bgp-neighbor;
             }
             container eigrp {
               presence "Configure EIGRP";
