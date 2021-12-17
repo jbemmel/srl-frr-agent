@@ -12,9 +12,11 @@ class PrefixManager:
     """
     Manages route prefixes received through netlink, and forwards them to the NDK.
 
-    In 21.6.4 (at least) the NDK does not like NHGs without IP next hops provisioned,
-    so this class holds on to those prefixes until the nexthop is resolved
-    (by FRR BGP unnumbered session coming online)
+    Originally, I thought that in 21.6.4 (at least) the NDK did not like NHGs
+    without IP next hops provisioned,so this class holds on to those prefixes
+    until the nexthop is resolved (by FRR BGP unnumbered session coming online)
+
+    Later I learned that the issue is bgpd not liking ipv4 routes with ipv6 nexthops
     """
     def __init__(self,net_inst,gnmi_channel,metadata,config):
         self.network_instance = net_inst
@@ -149,10 +151,6 @@ class PrefixManager:
             route_info.key.ip_prefix.ip_addr.addr = ip.packed
             route_info.key.ip_prefix.prefix_length = int(prefix_length)
 
-            #
-            # SDK allows to either specify a NHG name, or a list of nexthop IPs
-            # nexthop = route_info.nexthop.add()
-            #
             use_v6 = self.config['use_ipv6_nexthops_for_ipv4'] or ip.version==6
             route_info.data.nexthop_group_name = NHG_name( interface, not use_v6 )
 

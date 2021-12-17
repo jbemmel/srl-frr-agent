@@ -719,7 +719,8 @@ def Run():
         logging.error(f'_Rendezvous error: {err}')
 
     except Exception as e:
-        logging.error(f'Exception caught :: {e}')
+        logging.error( "General exception in Run -> exitting" )
+        logging.exception(e)
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
     # for n in state.ipdbs:
