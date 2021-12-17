@@ -125,6 +125,8 @@ module srl-frr-agent {
               }
 
               // Allow provisioning of BGP neighbors, using the native model
+              // Requires the groups too, as neighbors reference group-name
+              uses srl_nokia-bgp:bgp-group;
               uses srl_nokia-bgp:bgp-neighbor;
             }
             container eigrp {
