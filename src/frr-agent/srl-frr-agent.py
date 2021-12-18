@@ -331,9 +331,8 @@ class MonitoringThread(Thread):
 
    def run(self):
       logging.info( f"MonitoringThread run(): {self.net_inst} {self.interfaces}")
-
+      ni = self.state.network_instances[ self.net_inst ]
       try:
-        ni = self.state.network_instances[ self.net_inst ]
         cfg = ni['config']
 
         # Create per-thread gNMI stub, using a global channel
@@ -441,6 +440,7 @@ class MonitoringThread(Thread):
          logging.error( f"MonitoringThread error: {e} trace={traceback_str}" )
 
       logging.info( f"MonitoringThread exit: {self.net_inst}" )
+      del ni['monitor_thread']
 
 #
 # Adds or removes given interface using vtysh
@@ -666,6 +666,7 @@ def Handle_Notification(obj, state):
         else:
             logging.warning( f"Ignoring: {obj.config.key.js_path}" )
 
+        logging.info( f"Updated config for {net_inst}: {ni}" )
         state.network_instances[ net_inst ] = ni
         return net_inst
     else:
@@ -720,14 +721,17 @@ class State(object):
 def UpdateDaemons( state, modified_netinstances ):
     for n in modified_netinstances:
        ni = state.network_instances[ n ]
-       # Shouldn't run monitoringthread more than once per interface
-       interfaces = ni['bgp_interfaces'] if 'bgp_interfaces' in ni else {}
-       if 'monitor_thread' not in ni:
-          ni['monitor_thread'] = MonitoringThread( state, n, interfaces )
-          ni['monitor_thread'].start()
+       # Shouldn't run more than one monitoringthread
+       if 'config' in ni:
+         interfaces = ni['bgp_interfaces'] if 'bgp_interfaces' in ni else {}
+         if 'monitor_thread' not in ni:
+            ni['monitor_thread'] = MonitoringThread( state, n, interfaces )
+            ni['monitor_thread'].start()
+         else:
+            logging.info( f"MonitorThread already running, sending updated(?) list: {interfaces}" )
+            ni['monitor_thread'].CheckForUpdatedInterfaces()
        else:
-          logging.info( f"MonitorThread already running, sending updated(?) list: {interfaces}" )
-          ni['monitor_thread'].CheckForUpdatedInterfaces()
+           logging.warning( "Incomplete config, not starting MonitoringThread" )
 
 ##################################################################################################
 ## This is the main proc where all processing for FRR agent starts.
