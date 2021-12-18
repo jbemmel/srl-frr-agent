@@ -358,6 +358,26 @@ class MonitoringThread(Thread):
              lines += f'neighbor {name} interface v6only remote-as {peer_as}\n '
              # Use configured BGP port, custom patch
              lines += f'neighbor {name} port {cfg["frr_bgpd_port"]}\n '
+
+           # Add 'regular' bgp groups and peers
+           for g,gs in self.state.groups.items():
+             # remote-as must come first
+             remote_as = 'internal' if 'peer_as' not in gs else gs['peer_as']['value']
+             lines += f' neighbor {g} remote-as {remote_as} peer-group\n'
+             if g=='ibgp':
+                lines += f' neighbor {g} update-source lo0\n'
+             if 'addpath' in cfg:
+                addpath = cfg['addpath']
+                if addpath['tx_all_paths']['value']:
+                    lines += f' neighbor {g} addpath-tx-all-paths\n'
+                if addpath['tx_bestpath_per_AS']['value']:
+                    lines += f' neighbor {g} addpath-tx-bestpath-per-AS\n'
+                if addpath['disable-rx']['value']:
+                    lines += f' neighbor {g} disable-addpath-rx\n'
+
+           for n,ns in self.state.neighbors.items():
+             lines += f' neighbor {n} peer-group {ns["peer_group"]["value"]}\n'
+
            cfg["bgp_neighbor_lines"] = lines
            logging.info( f"About to (re)start FRR in {ni} to add {i}" )
            script_update_frr( **cfg )
@@ -365,6 +385,8 @@ class MonitoringThread(Thread):
 
       try:
         self.todo = list( self.interfaces.keys() ) # Initial list
+        if self.todo == []:
+            self.todo = [ "dummy_to_trigger_config" ]
         while True: # Keep waiting for interfaces to be added/removed
           while self.todo!=[]:
            for _i in self.todo:
@@ -454,8 +476,15 @@ def Handle_Notification(obj, state):
         if net_inst == "mgmt":
             return None
 
+        def get_data_as_json():
+          if obj.config.op == 2: # Skip deletes, TODO process them?
+             return {}
+          json_acceptable_string = obj.config.data.json.replace("'", "\"")
+          return json.loads(json_acceptable_string)
+
         ni = state.network_instances[ net_inst ] if net_inst in state.network_instances else {}
-        if obj.config.key.js_path == ".network_instance.protocols.experimental_frr":
+        base_path = ".network_instance.protocols.experimental_frr"
+        if obj.config.key.js_path == base_path:
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             # Could define NETNS here: "NETNS" : f'srbase-{net_inst}'
@@ -478,8 +507,7 @@ def Handle_Notification(obj, state):
                 restartFRR = updateParam( "admin_state", "disable" )
                 # state.network_instances.pop( net_inst, None )
             else:
-                json_acceptable_string = obj.config.data.json.replace("'", "\"")
-                data = json.loads(json_acceptable_string)
+                data = get_data_as_json()
                 enabled_daemons = []
                 if 'admin_state' in data:
                     restartFRR = updateParam( "admin_state", data['admin_state'][12:] )
@@ -501,6 +529,12 @@ def Handle_Notification(obj, state):
                     params[ "route_import" ] = bgp['route_import'][13:]
                     params[ "assign_static_ipv6" ] = bgp['assign_static_ipv6']['value']
                     params[ "use_ipv6_nexthops_for_ipv4" ] = bgp['use_ipv6_nexthops_for_ipv4']['value']
+
+                    if 'anycast_nexthop' in bgp:
+                       params[ "anycast_nexthop" ] = bgp['anycast_nexthop']['value']
+
+                    if 'addpath' in bgp:
+                       params[ "addpath" ] = bgp['addpath']
 
                 if 'eigrp' in data:
                     eigrp = data['eigrp']
@@ -549,13 +583,11 @@ def Handle_Notification(obj, state):
                 ni['config'].update( **params )
             else:
                 ni['config'] = params
-            state.network_instances[ net_inst ] = ni
 
         # Tends to come first (always?) when full blob is configured
         elif obj.config.key.js_path == ".network_instance.interface":
           if obj.config.op != 2: # Skip deletes, TODO process them?
-            json_acceptable_string = obj.config.data.json.replace("'", "\"")
-            data = json.loads(json_acceptable_string)
+            data = get_data_as_json()
 
             # 'interface' only present when bgp-unnumbered param is set
             peer_as = None
@@ -579,24 +611,19 @@ def Handle_Notification(obj, state):
               mapping = { intf : peer_as }
               if 'bgp_interfaces' in ni:
                 ni['bgp_interfaces'].update( mapping )
-              elif ni=={}:
-                state.network_instances[ net_inst ] = {
-                  "bgp_interfaces" : mapping
-                }
               else:
                 ni['bgp_interfaces'] = mapping
 
         elif obj.config.key.js_path == ".network_instance.interface.openfabric":
             logging.info("Process openfabric interface config")
-            json_acceptable_string = obj.config.data.json.replace("'", "\"")
-            data = json.loads(json_acceptable_string)
+            data = get_data_as_json()
 
             # Given the key, this should be present
             activate = data['activate']['value']
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
             if 'config' in ni:
                 cfg = ni['config']
-                ni['openfabric_interfaces'][ intf ] = True
+                cfg['openfabric_interfaces'][ intf ] = True
 
                 if 'frr' in ni and ni['frr']=='running':
                   if 'openfabric' in cfg and cfg['openfabric']=='enable':
@@ -607,10 +634,20 @@ def Handle_Notification(obj, state):
                         cmds += "openfabric passive"
                      run_vtysh( ns=net_inst,context=f"interface {intf}",config=cmds )
             elif activate:
-                state.network_instances[ net_inst ].update( {
-                    "config" : { "openfabric_interfaces" : { intf : True } },
-                } )
+                ni['config'] = { "openfabric_interfaces" : { intf : True } }
 
+        elif obj.config.key.js_path == base_path + ".group":
+           group_name = obj.config.key.keys[1]
+           ni['groups'][ group_name ] = get_data_as_json()
+           ni.update( { 'frr' : 'restart' } )
+        elif obj.config.key.js_path == base_path + ".neighbor":
+           neighbor_ip = obj.config.key.keys[1]
+           ni['neighbors'][ neighbor_ip ] = get_data_as_json()
+           ni.update( { 'frr' : 'restart' } )
+        else:
+            logging.warning( f"Ignoring: {obj.config.key.js_path}" )
+
+        state.network_instances[ net_inst ] = ni
         return net_inst
     else:
         logging.info(f"Unexpected notification : {obj}")
@@ -657,6 +694,9 @@ class State(object):
     def __init__(self):
         self.network_instances = {}   # Indexed by name
         self.ipdbs = {}               # Indexed by name
+
+        self.groups = {}    # BGP groups
+        self.neighbors = {} # BGP neighbors
         # TODO more properties
 
     def __str__(self):

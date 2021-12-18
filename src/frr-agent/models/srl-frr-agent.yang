@@ -63,6 +63,13 @@ module srl-frr-agent {
 
                     Disable causes all BGP sessions to be taken down immediately, even if admin-state at the group or neighbor level of some of these sessions is still set as enable.";
             }
+
+            // Allow provisioning of BGP neighbors, using the native model
+            // Requires the groups too, as neighbors reference group-name
+            // Needs to be at this level as opposed to 'bgp'
+            uses srl_nokia-bgp:bgp-group;
+            uses srl_nokia-bgp:bgp-neighbor;
+
             container bgp {
               presence "Configure BGP";
               leaf admin-state {
@@ -124,10 +131,12 @@ module srl-frr-agent {
                 description "Configure FRR to rewrite the nexthop with this anycast IP (presumably announced by BGP peers)";
               }
 
-              // Allow provisioning of BGP neighbors, using the native model
-              // Requires the groups too, as neighbors reference group-name
-              uses srl_nokia-bgp:bgp-group;
-              uses srl_nokia-bgp:bgp-neighbor;
+              container addpath {
+                description "Mapping of FRR Add Path capabilities";
+                leaf tx-all-paths { type boolean; default false; }
+                leaf tx-bestpath-per-AS { type boolean; default false; }
+                leaf disable-rx { type boolean; default false; }
+              }
             }
             container eigrp {
               presence "Configure EIGRP";
