@@ -325,71 +325,71 @@ class MonitoringThread(Thread):
         else:
            logging.info( f"UpdateInterfaces: already have {i}: {cli}" )
 
-      if changes > 0:
+      if changes > 0 or ni['frr']=='restart':
          logging.info( f"UpdateInterfaces: Signalling update event changes={changes}" )
          self.event.set()
 
    def run(self):
-      logging.info( f"MonitoringThread: {self.net_inst} {self.interfaces}")
-
-      ni = self.state.network_instances[ self.net_inst ]
-      cfg = ni['config']
-
-      # Create per-thread gNMI stub, using a global channel
-      self.gnmi_stub = gNMIStub( gnmi_channel )
-
-      # Create Prefix manager, this starts listening to netlink route events
-      if cfg['route_import'] == "ndk":
-        from prefix_mgr import PrefixManager
-        self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata, cfg )
-      else:
-        self.ConfigureLinuxRouteImport()
-
-      if cfg['use_ipv6_nexthops_for_ipv4']:
-          # Could combine gNMI calls
-          self.ConfigureIPv4UsingIPv6Nexthops()
-
-      # moved to auto-config agent
-      # ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub )
-
-      def add_interface_to_config(i):
-        """
-        Updates FRR config lines that specify interfaces to listen/connect on
-        and (re)starts the daemon for changes to take effect
-        """
-        if 'bgp_neighbor_lines' not in cfg or i not in cfg['bgp_neighbor_lines']:
-           lines = ""
-           for name,peer_as in ni['bgp_interfaces'].items():
-             # Add single indent space at end
-             lines += f'neighbor {name} interface v6only remote-as {peer_as}\n '
-             # Use configured BGP port, custom patch
-             lines += f'neighbor {name} port {cfg["frr_bgpd_port"]}\n '
-
-           # Add 'regular' bgp groups and peers
-           for g,gs in (cfg['groups'].items() if 'groups' in cfg else []):
-             # remote-as must come first
-             remote_as = 'internal' if 'peer_as' not in gs else gs['peer_as']['value']
-             lines += f' neighbor {g} remote-as {remote_as} peer-group\n'
-             if g=='ibgp':
-                lines += f' neighbor {g} update-source lo0\n'
-             if 'addpath' in cfg:
-                addpath = cfg['addpath']
-                if addpath['tx_all_paths']['value']:
-                    lines += f' neighbor {g} addpath-tx-all-paths\n'
-                if addpath['tx_bestpath_per_AS']['value']:
-                    lines += f' neighbor {g} addpath-tx-bestpath-per-AS\n'
-                if addpath['disable-rx']['value']:
-                    lines += f' neighbor {g} disable-addpath-rx\n'
-
-           for n,ns in (cfg['neighbors'].items() if 'neighbors' in cfg else []):
-             lines += f' neighbor {n} peer-group {ns["peer_group"]["value"]}\n'
-
-           cfg["bgp_neighbor_lines"] = lines
-           logging.info( f"About to (re)start FRR in {ni} to add {i}" )
-           script_update_frr( **cfg )
-           ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
+      logging.info( f"MonitoringThread run(): {self.net_inst} {self.interfaces}")
 
       try:
+        ni = self.state.network_instances[ self.net_inst ]
+        cfg = ni['config']
+
+        # Create per-thread gNMI stub, using a global channel
+        self.gnmi_stub = gNMIStub( gnmi_channel )
+
+        # Create Prefix manager, this starts listening to netlink route events
+        if cfg['route_import'] == "ndk":
+          from prefix_mgr import PrefixManager
+          self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata, cfg )
+        else:
+          self.ConfigureLinuxRouteImport()
+
+        if cfg['use_ipv6_nexthops_for_ipv4']:
+            # Could combine gNMI calls
+            self.ConfigureIPv4UsingIPv6Nexthops()
+
+        # moved to auto-config agent
+        # ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub )
+
+        def add_interface_to_config(i):
+          """
+          Updates FRR config lines that specify interfaces to listen/connect on
+          and (re)starts the daemon for changes to take effect
+          """
+          if 'bgp_neighbor_lines' not in cfg or i not in cfg['bgp_neighbor_lines']:
+             lines = ""
+             for name,peer_as in ni['bgp_interfaces'].items():
+               # Add single indent space at end
+               lines += f'neighbor {name} interface v6only remote-as {peer_as}\n '
+               # Use configured BGP port, custom patch
+               lines += f'neighbor {name} port {cfg["frr_bgpd_port"]}\n '
+
+             # Add 'regular' bgp groups and peers
+             for g,gs in (cfg['groups'].items() if 'groups' in cfg else []):
+               # remote-as must come first
+               remote_as = 'internal' if 'peer_as' not in gs else gs['peer_as']['value']
+               lines += f' neighbor {g} remote-as {remote_as} peer-group\n'
+               if g=='ibgp':
+                  lines += f' neighbor {g} update-source lo0\n'
+               if 'addpath' in cfg:
+                  addpath = cfg['addpath']
+                  if addpath['tx_all_paths']['value']:
+                      lines += f' neighbor {g} addpath-tx-all-paths\n'
+                  if addpath['tx_bestpath_per_AS']['value']:
+                      lines += f' neighbor {g} addpath-tx-bestpath-per-AS\n'
+                  if addpath['disable_rx']['value']:
+                      lines += f' neighbor {g} disable-addpath-rx\n'
+
+             for n,ns in (cfg['neighbors'].items() if 'neighbors' in cfg else []):
+               lines += f' neighbor {n} peer-group {ns["peer_group"]["value"]}\n'
+
+             cfg["bgp_neighbor_lines"] = lines
+             logging.info( f"About to (re)start FRR in {ni} to add {i}" )
+             script_update_frr( **cfg )
+             ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
+
         self.todo = list( self.interfaces.keys() ) # Initial list
         if self.todo == []:
             self.todo = [ "dummy_to_trigger_config" ]
@@ -429,6 +429,9 @@ class MonitoringThread(Thread):
                 time.sleep(5)
                 logging.info( f"MonitoringThread wakes up left={self.todo}" )
           logging.info( "MonitoringThread done processing TODO list, waiting for events..." )
+          if ni['frr']=='restart':
+             script_update_frr( **cfg )
+             ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
           self.event.wait(timeout=None)
           logging.info( f"MonitoringThread received event, TODO={self.todo}" )
           self.event.clear() # Reset for next iteration
@@ -709,7 +712,6 @@ def run_vtysh(ns,context='',show=[],config=[]):
 class State(object):
     def __init__(self):
         self.network_instances = {}   # Indexed by name
-        self.ipdbs = {}               # Indexed by name
         # TODO more properties
 
     def __str__(self):
