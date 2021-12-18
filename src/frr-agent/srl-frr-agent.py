@@ -162,8 +162,13 @@ class MonitoringThread(Thread):
        self.net_inst = net_inst
        self.interfaces = interfaces # dict of intf->as
 
-       # Check that gNMI is connected now
-       grpc.channel_ready_future(gnmi_channel).result(timeout=5)
+       # Wait for gNMI to connect
+       while True:
+         try:
+           grpc.channel_ready_future(gnmi_channel).result(timeout=5)
+           break
+         except grpc.FutureTimeoutError:
+           logging.warning( "gRPC timeout, continue waiting 5s..." )
 
    def gNMI_Set( self, updates ):
       #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
@@ -360,7 +365,7 @@ class MonitoringThread(Thread):
              lines += f'neighbor {name} port {cfg["frr_bgpd_port"]}\n '
 
            # Add 'regular' bgp groups and peers
-           for g,gs in self.state.groups.items():
+           for g,gs in (cfg['groups'].items() if 'groups' in cfg else []):
              # remote-as must come first
              remote_as = 'internal' if 'peer_as' not in gs else gs['peer_as']['value']
              lines += f' neighbor {g} remote-as {remote_as} peer-group\n'
@@ -375,7 +380,7 @@ class MonitoringThread(Thread):
                 if addpath['disable-rx']['value']:
                     lines += f' neighbor {g} disable-addpath-rx\n'
 
-           for n,ns in self.state.neighbors.items():
+           for n,ns in (cfg['neighbors'].items() if 'neighbors' in cfg else []):
              lines += f' neighbor {n} peer-group {ns["peer_group"]["value"]}\n'
 
            cfg["bgp_neighbor_lines"] = lines
@@ -638,10 +643,14 @@ def Handle_Notification(obj, state):
 
         elif obj.config.key.js_path == base_path + ".group":
            group_name = obj.config.key.keys[1]
+           if 'groups' not in ni:
+               ni['groups'] = {}
            ni['groups'][ group_name ] = get_data_as_json()
            ni.update( { 'frr' : 'restart' } )
         elif obj.config.key.js_path == base_path + ".neighbor":
            neighbor_ip = obj.config.key.keys[1]
+           if 'neighbors' not in ni:
+               ni['neighbors'] = {}
            ni['neighbors'][ neighbor_ip ] = get_data_as_json()
            ni.update( { 'frr' : 'restart' } )
         else:
