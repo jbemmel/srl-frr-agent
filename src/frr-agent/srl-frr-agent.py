@@ -166,6 +166,7 @@ class MonitoringThread(Thread):
        while True:
          try:
            grpc.channel_ready_future(gnmi_channel).result(timeout=5)
+           logging.info( "gRPC unix socket connected" )
            break
          except grpc.FutureTimeoutError:
            logging.warning( "gRPC timeout, continue waiting 5s..." )
@@ -488,6 +489,18 @@ def Handle_Notification(obj, state):
           return json.loads(json_acceptable_string)
 
         ni = state.network_instances[ net_inst ] if net_inst in state.network_instances else {}
+
+        def update_conf(category,key,value,restart_frr=False):
+           if 'config' not in ni:
+               ni['config'] = {}
+           cfg = ni['config']
+           if category in cfg:
+               cfg[category].update( { key: value } )
+           else:
+               cfg[category] = { key: value }
+           if restart_frr and 'frr' in ni:
+               ni.update( { 'frr' : 'restart' } )
+
         base_path = ".network_instance.protocols.experimental_frr"
         if obj.config.key.js_path == base_path:
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
@@ -643,16 +656,10 @@ def Handle_Notification(obj, state):
 
         elif obj.config.key.js_path == base_path + ".group":
            group_name = obj.config.key.keys[1]
-           if 'groups' not in ni:
-               ni['groups'] = {}
-           ni['groups'][ group_name ] = get_data_as_json()
-           ni.update( { 'frr' : 'restart' } )
+           update_conf( 'groups', group_name, get_data_as_json(), True )
         elif obj.config.key.js_path == base_path + ".neighbor":
            neighbor_ip = obj.config.key.keys[1]
-           if 'neighbors' not in ni:
-               ni['neighbors'] = {}
-           ni['neighbors'][ neighbor_ip ] = get_data_as_json()
-           ni.update( { 'frr' : 'restart' } )
+           update_conf( 'neighbors', neighbor_ip, get_data_as_json(), True )
         else:
             logging.warning( f"Ignoring: {obj.config.key.js_path}" )
 
@@ -703,9 +710,6 @@ class State(object):
     def __init__(self):
         self.network_instances = {}   # Indexed by name
         self.ipdbs = {}               # Indexed by name
-
-        self.groups = {}    # BGP groups
-        self.neighbors = {} # BGP neighbors
         # TODO more properties
 
     def __str__(self):
@@ -715,7 +719,7 @@ def UpdateDaemons( state, modified_netinstances ):
     for n in modified_netinstances:
        ni = state.network_instances[ n ]
        # Shouldn't run monitoringthread more than once per interface
-       interfaces = ni['bgp_interfaces'] if 'bgp_interfaces' in ni else []
+       interfaces = ni['bgp_interfaces'] if 'bgp_interfaces' in ni else {}
        if 'monitor_thread' not in ni:
           ni['monitor_thread'] = MonitoringThread( state, n, interfaces )
           ni['monitor_thread'].start()
