@@ -369,9 +369,10 @@ class MonitoringThread(Thread):
              for g,gs in (cfg['groups'].items() if 'groups' in cfg else []):
                # remote-as must come first
                remote_as = 'internal' if 'peer_as' not in gs else gs['peer_as']['value']
-               lines += f' neighbor {g} remote-as {remote_as} peer-group\n'
-               if g=='ibgp':
-                  lines += f' neighbor {g} update-source lo0\n'
+               lines += f' neighbor {g} peer-group\n'
+               lines += f' neighbor {g} remote-as {remote_as}\n'
+               if remote_as=="internal":
+                  lines += f' neighbor {g} update-source lo0.0\n'
                if 'addpath' in cfg:
                   addpath = cfg['addpath']
                   if addpath['tx_all_paths']['value']:
@@ -382,7 +383,11 @@ class MonitoringThread(Thread):
                       lines += f' neighbor {g} disable-addpath-rx\n'
 
              for n,ns in (cfg['neighbors'].items() if 'neighbors' in cfg else []):
-               lines += f' neighbor {n} peer-group {ns["peer_group"]["value"]}\n'
+               if ns['admin_state'][12:] == "enable":
+                  lines += f' neighbor {n} peer-group {ns["peer_group"]["value"]}\n'
+               # Else simply don't add it
+
+             # TODO activate ipv4/ipv6 under address-family
 
              cfg["bgp_neighbor_lines"] = lines
              logging.info( f"About to (re)start FRR in {ni} to add {i}" )
@@ -656,10 +661,10 @@ def Handle_Notification(obj, state):
 
         elif obj.config.key.js_path == base_path + ".group":
            group_name = obj.config.key.keys[1]
-           update_conf( 'groups', group_name, get_data_as_json(), True )
+           update_conf( 'groups', group_name, get_data_as_json()['group'], True )
         elif obj.config.key.js_path == base_path + ".neighbor":
            neighbor_ip = obj.config.key.keys[1]
-           update_conf( 'neighbors', neighbor_ip, get_data_as_json(), True )
+           update_conf( 'neighbors', neighbor_ip, get_data_as_json()['neighbor'], True )
         else:
             logging.warning( f"Ignoring: {obj.config.key.js_path}" )
 
