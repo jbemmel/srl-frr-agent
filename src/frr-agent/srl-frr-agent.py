@@ -390,8 +390,6 @@ class MonitoringThread(Thread):
              ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
 
         self.todo = list( self.interfaces.keys() ) # Initial list
-        if self.todo==[]:
-          add_interface_to_config('initial_config') # Trigger config
         while True: # Keep waiting for interfaces to be added/removed
           while self.todo!=[]:
            for _i in self.todo:
@@ -429,8 +427,7 @@ class MonitoringThread(Thread):
                 logging.info( f"MonitoringThread wakes up left={self.todo}" )
           logging.info( "MonitoringThread done processing TODO list, waiting for events..." )
           if ni['frr']=='restart':
-             script_update_frr( **cfg )
-             ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
+             add_interface_to_config( "update_trigger" )
           self.event.wait(timeout=None)
           logging.info( f"MonitoringThread received event, TODO={self.todo}" )
           self.event.clear() # Reset for next iteration
