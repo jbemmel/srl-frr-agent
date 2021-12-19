@@ -390,8 +390,8 @@ class MonitoringThread(Thread):
              ni['frr'] = 'running' if cfg['admin_state']=='enable' else 'stopped'
 
         self.todo = list( self.interfaces.keys() ) # Initial list
-        if self.todo == []:
-            self.todo = [ "dummy_to_trigger_config" ]
+        if self.todo==[]:
+          add_interface_to_config('initial_config') # Trigger config
         while True: # Keep waiting for interfaces to be added/removed
           while self.todo!=[]:
            for _i in self.todo:
