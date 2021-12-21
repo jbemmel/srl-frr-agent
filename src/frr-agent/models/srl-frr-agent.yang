@@ -26,7 +26,9 @@ module srl-frr-agent {
         prefix srl_nokia-bgp;
     }
 
-    revision "2021-08-03" {
+    import srl_nokia-features { prefix srl_feat; }
+
+    revision "2021-12-21" {
         description "Initial revision";
         reference "TBD";
     }
@@ -110,6 +112,13 @@ module srl-frr-agent {
                 must ".=false() or not(../../../bgp)" {
                   error-message "Cannot use ipv6 nexthops for ipv4 when bgp is used";
                 }
+              }
+
+              leaf use-ipv4-link-local-range {
+                description "Flag to enable the use of IPv4 link local addresses, supported starting release 21.11";
+                if-feature "srl-feat:future-21-11";
+                type boolean;
+                default true;
               }
 
               leaf route-import {

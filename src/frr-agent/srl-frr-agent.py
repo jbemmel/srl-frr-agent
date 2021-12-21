@@ -285,7 +285,8 @@ class MonitoringThread(Thread):
       if ni_config["use_ipv6_nexthops_for_ipv4"]:
           result = (None,peer_v6)
       else:
-          ips = GetLinkLocalIPs( phys_sub[0], "192.0.0.0/24" )
+          ipv4_range = "169.254.0.0/24" if ni_config["use_ipv4_link_local_range"] else "192.0.0.0/24"
+          ips = GetLinkLocalIPs( phys_sub[0], ipv4_range )
           config['ipv4'] = {
              "address" : [
                 { "ip-prefix" : ips[ 0 ] + "/31",
@@ -552,6 +553,9 @@ def Handle_Notification(obj, state):
                     params[ "route_import" ] = bgp['route_import'][13:]
                     params[ "assign_static_ipv6" ] = bgp['assign_static_ipv6']['value']
                     params[ "use_ipv6_nexthops_for_ipv4" ] = bgp['use_ipv6_nexthops_for_ipv4']['value']
+
+                    params[ "use_ipv4_link_local_range" ] = (bgp['use_ipv4_link_local_range']['value']
+                      if 'use_ipv4_link_local_range' in bgp else False)
 
                     if 'anycast_nexthop' in bgp:
                        params[ "anycast_nexthop" ] = bgp['anycast_nexthop']['value']
