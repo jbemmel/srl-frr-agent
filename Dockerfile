@@ -4,7 +4,13 @@ ARG SR_LINUX_RELEASE
 # FROM srl/custombase:$SR_LINUX_RELEASE AS target
 FROM $SR_BASEIMG:$SR_LINUX_RELEASE AS target
 
+# Create a Python virtual environment, note --upgrade is broken
+# RUN sudo python3 -m venv /opt/demo-agents/frr-agent/.venv --system-site-packages --without-pip
+# ENV VIRTUAL_ENV=/opt/demo-agents/frr-agent/.venv
+# ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
 RUN sudo yum install -y python3-pyroute2
+# RUN sudo pip3 install pyroute2
 
 # Install FRR stable, enable BGP daemon
 # frr-stable or frr-8 or frr-7
@@ -17,7 +23,7 @@ RUN sudo yum install -y python3-pyroute2
 
 # Add custom FRR build
 RUN sudo yum install -y https://ci1.netdef.org/artifact/LIBYANG-LIBYANGV2/shared/build-2/CentOS-8-x86_64-Packages/libyang2-2.0.0.10.g2eb910e4-1.el8.x86_64.rpm \
-        https://ci1.netdef.org/artifact/RPKI-RTRLIB/shared/build-110/CentOS-7-x86_64-Packages/librtr-0.7.0-1.el7.centos.x86_64.rpm
+    https://ci1.netdef.org/artifact/RPKI-RTRLIB/shared/build-110/CentOS-7-x86_64-Packages/librtr-0.7.0-1.el7.centos.x86_64.rpm
 
 COPY frr/docker/centos-8/pkgs/x86_64/frr-8.?_git*.el8.x86_64.rpm /tmp/frr8.rpm
 
@@ -32,7 +38,7 @@ RUN sudo yum install -y /tmp/frr8.rpm \
 RUN sudo mkdir -p /home/admin && printf '%s\n' \
   '"vtysh {network-instance}" = "bash /usr/bin/sudo /usr/bin/vtysh --vty_socket /var/run/frr/srbase-{}/"' \
   \
->> /home/admin/.srlinuxrc
+ >> /home/admin/.srlinuxrc
 
 RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/frr-agent
 COPY --chown=srlinux:srlinux ./srl-frr-agent.yml /etc/opt/srlinux/appmgr

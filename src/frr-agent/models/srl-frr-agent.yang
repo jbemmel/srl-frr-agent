@@ -116,7 +116,7 @@ module srl-frr-agent {
 
               leaf use-ipv4-link-local-range {
                 description "Flag to enable the use of IPv4 link local addresses, supported starting release 21.11";
-                if-feature "srl-feat:future-21-11";
+                if-feature "srl_feat:future-21-11";
                 type boolean;
                 default true;
               }
