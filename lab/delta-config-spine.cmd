@@ -42,7 +42,7 @@ set /system gnmi-server unix-socket admin-state enable
                 bgp {
                     admin-state enable
                     use-ipv6-nexthops-for-ipv4 true
-                    assign-static-ipv6 false
+                    assign-static-ipv6 true !!! Because 21.11 NDK does not support link-local ipv6 next hops yet
                 }
             }
             bgp {
