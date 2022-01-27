@@ -106,12 +106,12 @@ module srl-frr-agent {
               }
 
               leaf use-ipv6-nexthops-for-ipv4 {
-                description "Flag to enable the use of IPv6 nexthops for IPv4, default disabled";
+                description "Flag to enable the use of IPv6 nexthops for IPv4, default enabled";
                 type boolean;
-                default false; // to avoid bgp mgr crashes
-                must ".=false() or not(../../../bgp)" {
-                  error-message "Cannot use ipv6 nexthops for ipv4 when bgp is used";
-                }
+                default true; // In versions before 21.11.1 bgpd crashed, but not anymore
+                // must ".=false() or not(../../../bgp)" {
+                //  error-message "Cannot use ipv6 nexthops for ipv4 when bgp is used";
+                // }
               }
 
               leaf use-ipv4-link-local-range {

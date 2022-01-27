@@ -42,7 +42,24 @@ set /system gnmi-server unix-socket admin-state enable
                 bgp {
                     admin-state enable
                     use-ipv6-nexthops-for-ipv4 true
+                    assign-static-ipv6 false
                 }
+            }
+
+            bgp {
+             admin-state enable
+             autonomous-system 65123
+             router-id 1.1.1.1
+             group ibgp {
+                 peer-as 65123
+             }
+             ipv4-unicast {
+                 admin-state enable
+             }
+             neighbor 100.1.0.1 {
+                 admin-state enable
+                 peer-group ibgp
+             }
             }
         }
     }
