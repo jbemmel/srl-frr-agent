@@ -12,10 +12,10 @@ topology:
        srl-agents: [ ../srl-frr-agent.yml ]
 
   nodes:
-    leaf1:  { kind: srl, group: leaves, startup-config: leaf1-frr.cfg.json }
+    leaf1:  { kind: srl, group: leaves, startup-config: delta-config-leaf.cmd }
     # leaf1:  { kind: srl, group: leaves, startup-config: delta-config-acl.cmd }
 
-    spine1: { kind: srl, group: spines, startup-config: spine1-frr.cfg.json }
+    spine1: { kind: srl, group: spines, startup-config: delta-config-spine.cmd }
     # spine1: { kind: srl, group: spines, startup-config: delta-config-acl.cmd }
     # spine1: { kind: srl, group: spines, startup-config: spine1.cfg.json }
 
