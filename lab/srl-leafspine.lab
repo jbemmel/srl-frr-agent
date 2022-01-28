@@ -1,23 +1,17 @@
-name: srl-frr
+name: srl-bgp-unnumbered-using-frr
 
 topology:
   kinds:
     srl:
-      # Need IXR D2 or D3 for EVPN/VXLAN support
-      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # Uses custom container image containing FRR agent
-      image: srl/frr-demo:latest
-      # image: srl/custombase:latest
+      image: srl/bgp-unnumbered-using-frr:latest
       extras:
        srl-agents: [ ../srl-frr-agent.yml ]
 
   nodes:
     leaf1:  { kind: srl, group: leaves, startup-config: delta-config-leaf.cmd }
-    # leaf1:  { kind: srl, group: leaves, startup-config: delta-config-acl.cmd }
 
     spine1: { kind: srl, group: spines, startup-config: delta-config-spine.cmd }
-    # spine1: { kind: srl, group: spines, startup-config: delta-config-acl.cmd }
-    # spine1: { kind: srl, group: spines, startup-config: spine1.cfg.json }
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]

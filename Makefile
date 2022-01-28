@@ -10,7 +10,7 @@ endif
 .PHONY: build build-combined do-build frr build-srlinux
 
 build: BASEIMG=srl/custombase
-build: NAME=srl/frr-demo
+build: NAME=srl/bgp-unnumbered-using-frr
 build: do-build
 
 do-build:
@@ -31,7 +31,7 @@ frr:
 	sudo DOCKER_BUILDKIT=1 docker/centos-8/build.sh
 
 build-srlinux: BASEIMG=ghcr.io/nokia/srlinux
-build-srlinux: NAME=srl/frr-demo
+build-srlinux: NAME=srl/bgp-unnumbered-using-frr
 build-srlinux: do-build
 
 #
