@@ -1,9 +1,10 @@
-import logging
-import ipaddress
+import logging, ipaddress, json
+from datetime import datetime
 
 from sdk_protos import route_service_pb2,route_service_pb2_grpc
 from sdk_protos import nexthop_group_service_pb2 as ndk_nhg_pb2
 from sdk_protos import nexthop_group_service_pb2_grpc as ndk_nhg_grpc
+from sdk_protos import telemetry_service_pb2,telemetry_service_pb2_grpc
 
 def NHG_name(interface,v4=False):
     return f"bgpu_{'v4_' if v4 else ''}{interface}_sdk" # Must end with _sdk
@@ -18,18 +19,29 @@ class PrefixManager:
 
     Later I learned that the issue is bgpd not liking ipv4 routes with ipv6 nexthops
     """
-    def __init__(self,net_inst,gnmi_channel,metadata,config):
+    def __init__(self,net_inst,sdk_channel,metadata,config):
         self.network_instance = net_inst
-        self.channel = gnmi_channel
+        self.channel = sdk_channel
         self.metadata = metadata  # Credentials for API access
         self.config = config      # Settings for this network instance
         self.oif_2_interface = {} # Map of oif to resolved interface name
         self.nhg_2_peer_nh_ips = {} # NHG name to (v4,v6) nexthop address(es)
         self.unresolved_ecmp_groups = {} # ECMP routes, key=oif bitmask
         self.pending_routes = {} # Map of unresolved routes, per interface index
+        self.stats = { 'ipv4': { 'value' : 0 }, 'ipv6': { 'value': 0 } }
 
         # connect to ipdb to receive netlink messages
         self.RegisterRouteHandler(net_inst)
+
+    def Add_Telemetry(self,js_path,js_data):
+        telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(self.channel)
+        telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
+        telemetry_info = telemetry_update_request.state.add()
+        telemetry_info.key.js_path = f'.network_instance{{.name=="{self.network_instance}"}}.protocols.experimental_frr' + js_path
+        telemetry_info.data.json_content = json.dumps(js_data)
+        logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
+        telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=self.metadata)
+        return telemetry_response
 
     #
     # Registers an IPDB callback handler for route events in the given VRF instance
@@ -46,8 +58,8 @@ class PrefixManager:
 
       # Need to do this in a separate thread, not same as processing config
       # Needs yum install python3-pyroute2 -y
-      from pyroute2 import IPDB
-      from pyroute2 import NetNS
+      from pyroute2 import IPDB  # pylint: disable=no-name-in-module
+      from pyroute2 import NetNS # pylint: disable=no-name-in-module
       self.ipdb = IPDB(nl=NetNS(f'srbase-{net_inst}'))
       for i in self.ipdb.interfaces:
           index = self.ipdb.interfaces[i]['index']
@@ -154,12 +166,16 @@ class PrefixManager:
             use_v6 = self.config['use_ipv6_nexthops_for_ipv4'] or ip.version==6
             route_info.data.nexthop_group_name = NHG_name( interface, not use_v6 )
 
+            self.stats[ f'ipv{ip.version}' ]['value'] += 1
+
         logging.info(f"RouteAddOrUpdate REQUEST :: {route_request}")
         route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(self.channel)
         route_response = route_stub.RouteAddOrUpdate(request=route_request,
                                                      metadata=self.metadata)
         logging.info(f"RouteAddOrUpdate RESPONSE:: {route_response.status} " +
                                                  f"{route_response.error_str}" )
+
+        self.Add_Telemetry( '.stats.routes', self.stats )
         return route_response.status == 0
 
     def del_Route( self, netlink_msg ):
@@ -210,7 +226,7 @@ class PrefixManager:
         self.NDK_AddOrUpdateNextHopGroup( nhg_name )
         self.resolve_pending_routes( nhg_name, nhg_name )
 
-    def onInterfaceBGPv6Connected(self,interface,peer_nhs):
+    def onInterfaceBGPv6Connected(self,interface,peer_nhs,peer_id,peer_as):
         """
         Called when FRR BGP unnumbered ipv6 session comes up
         """
@@ -219,6 +235,11 @@ class PrefixManager:
         self.oif_2_interface[intf_index] = interface
         self.nhg_2_peer_nh_ips[interface] = { peer_nhs: intf_index }  # (v4,v6)
         self.NDK_AddOrUpdateNextHopGroup( interface )
+        peer_data = {
+          'last_updated': { 'value': datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ") },
+          'peer_as': { 'value': peer_as }
+        }
+        self.Add_Telemetry( f'.peer{{.router_id=="{peer_id}"}}', peer_data )
 
         # Also update any ECMP groups that this interface belongs to
         for nhg_name in list(self.unresolved_ecmp_groups.keys()):

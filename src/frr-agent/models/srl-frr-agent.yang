@@ -45,6 +45,7 @@ module srl-frr-agent {
 
         container experimental-frr {
             presence "Configure FRR BGP";
+            srl_nokia-ext:delivery-node-override true;
             must "../../type != 'srl_nokia-netinst:mac-vrf'" {
               error-message "FRR configuration is not supported on network-instance of type mac-vrf";
             }
@@ -232,14 +233,40 @@ module srl-frr-agent {
 
             leaf oper-state {
                 config false;
-                type enumeration {
-                    enum "up" {
-                        description "Operational state of FRR BGP is up.";
-                    }
-                    enum "down" {
-                        description "Operational state of FRR BGP is down.";
-                    }
-                }
+                // type enumeration {
+                //    enum "up" {
+                //        description "Operational state of FRR process is up.";
+                //    }
+                //    enum "down" {
+                //        description "Operational state of FRR process is down.";
+                //    }
+                // }
+                type string;
+                default "down";
+            }
+
+            list peer {
+             config false;
+             key router-id;
+             leaf router-id { type srl_nokia-comm:ip-address; }
+             leaf peer-as {
+              type uint32 { range "1..4294967295"; }
+              description "Auto-discovered peer AS";
+             }
+             leaf last-updated {
+               type srl_nokia-comm:date-and-time-delta;
+             }
+            }
+
+            container stats {
+              presence "Stats";
+              srl_nokia-ext:delivery-node-override true;
+              config false;
+
+              container routes {
+                leaf ipv4 { type srl_nokia-comm:zero-based-counter64; }
+                leaf ipv6 { type srl_nokia-comm:zero-based-counter64; }
+              }
             }
         }
     }
@@ -292,7 +319,4 @@ module srl-frr-agent {
        }
     }
 
-    // TODO extend network-instance/interface with flags to
-    // 1. Establish BGP unnumbered peering
-    // 2. Export the interface IP to peers (?) or simply all connected
 }

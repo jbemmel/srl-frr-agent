@@ -18,9 +18,8 @@ from sdk_protos import sdk_service_pb2, sdk_service_pb2_grpc,config_service_pb2
 
 # import sdk_common_pb2
 
-# To report state back, TODO
-# import telemetry_service_pb2
-# import telemetry_service_pb2_grpc
+# To report state back
+import telemetry_service_pb2,telemetry_service_pb2_grpc
 
 from pygnmi.client import gNMIclient
 
@@ -83,26 +82,19 @@ def Subscribe_Notifications(stream_id):
     Subscribe(stream_id, 'cfg')
     # Subscribe(stream_id, 'nexthop_group')
 
-#
-# Avoids a crash in BGP mgr by rejecting ipv4 routes on import
-#
-#def ConfigureImportPolicyToAvoidBGPManagerCrash( gnmi_stub ):
-#
-#    reject_ipv4 = {
-#      "default-action": { "accept": { } },
-#      "statement": [
-#        {
-#          "sequence-id": 10,
-#          "match": { "family": "srl_nokia-common:ipv4-unicast" },
-#          "action": { "reject": { } }
-#        }
-#      ]
-#    }
-#    imp_policy = { 'import-policy' : "reject-ipv4" }
-#    updates = [ ( '/routing-policy/policy[name=reject-ipv4]', reject_ipv4 ),
-#                ( '/network-instance[name=default]/protocols/bgp', imp_policy )
-#              ]
-#    gNMI_Set( gnmi_stub, updates=updates )
+############################################################
+## Function to populate state of agent config
+## using telemetry -- add/update info from state
+############################################################
+def Add_Telemetry(js_path, js_data):
+    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
+    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
+    telemetry_info = telemetry_update_request.state.add()
+    telemetry_info.key.js_path = js_path
+    telemetry_info.data.json_content = json.dumps(js_data)
+    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
+    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
+    return telemetry_response
 
 #
 # Uses gNMI to get /platform/chassis/mac-address and format as hhhh.hhhh.hhhh
@@ -340,7 +332,7 @@ class MonitoringThread(Thread):
 
         # Create Prefix manager, this starts listening to netlink route events
         if cfg['route_import'] == "ndk":
-          from prefix_mgr import PrefixManager
+          from prefix_mgr import PrefixManager # pylint: disable=import-error
           self.prefix_mgr = PrefixManager( self.net_inst, channel, metadata, cfg )
         else:
           self.ConfigureLinuxRouteImport()
@@ -422,7 +414,7 @@ class MonitoringThread(Thread):
                           peer_nhs = (None,neighbor) # /64 link-local ipv6 address
 
                       if hasattr(self,'prefix_mgr'):
-                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_nhs )
+                         self.prefix_mgr.onInterfaceBGPv6Connected( _i, peer_nhs, peerId, i['remoteAs'] )
                       self.todo.remove( _i )
                       logging.info( f"MonitoringThread done with {_i}, left={self.todo}" )
                       continue
@@ -696,6 +688,11 @@ def script_update_frr(**kwargs):
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'manage-frr result: {stdoutput} err={stderroutput}')
+       # Add_Telemetry( '.network_instance{.name=="default"}.protocols.experimental_frr',
+       #              { 'oper_state': 'up' } )
+       Add_Telemetry( '.network_instance{.name=="default"}.protocols.experimental_frr',
+                      { 'oper_state' : { 'value': 'up' }} )
+
     except Exception as e:
        logging.error(f'Exception caught in script_update_frr :: {e}')
 

@@ -5,12 +5,13 @@ ARG SR_LINUX_RELEASE
 FROM $SR_BASEIMG:$SR_LINUX_RELEASE AS target
 
 # Create a Python virtual environment, note --upgrade is broken
-# RUN sudo python3 -m venv /opt/demo-agents/frr-agent/.venv --system-site-packages --without-pip
-# ENV VIRTUAL_ENV=/opt/demo-agents/frr-agent/.venv
-# ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN sudo python3 -m venv /opt/demo-agents/frr-agent/.venv --system-site-packages --without-pip
+ENV VIRTUAL_ENV=/opt/demo-agents/frr-agent/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN sudo yum install -y python3-pyroute2
-# RUN sudo pip3 install pyroute2
+# RUN sudo yum update --best --allowerasing && sudo yum install -y python3-pyroute2.noarch
+RUN sudo $VIRTUAL_ENV/bin/python3 -m pip install --upgrade pyroute2 pyroute2-ipdb
+ENV AGENT_PYTHONPATH="$VIRTUAL_ENV/lib/python3.6/site-packages:$AGENT_PYTHONPATH"
 
 # Install FRR stable, enable BGP daemon
 # frr-stable or frr-8 or frr-7
@@ -45,7 +46,7 @@ COPY --chown=srlinux:srlinux ./srl-frr-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/demo-agents/
 
 # Add in auto-config agent sources too
-COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
+COPY --from=srl/auto-config-v2:latest /opt/demo-agents/auto-config-agent/ /opt/demo-agents/auto-config-agent/
 
 # Stop BGP mgr from crashing (change jump location to ignore "bad" ipv4 prefix)
 # Find offset: LANG=C grep -obUaP "\x75\x43\x48\x85\xc9\x0f\x84\xd2\x00\x00\x00" /opt/srlinux/bin/sr_bgp_mgr => 6751939 + 7 = 6751946
