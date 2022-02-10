@@ -3,7 +3,7 @@
     "igp": "bgp-unnumbered",
     "evpn": {
       "model": "symmetric-irb",
-      "auto-lags": "disabled"
+      "auto-lags": "encoded-ipv6"
     }
   },
   "srl_nokia-acl:acl": {

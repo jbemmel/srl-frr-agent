@@ -17,7 +17,7 @@ topology:
 
     linux:
       # image: ghcr.io/hellt/network-multitool
-      image: alpine-with-lldp:latest # Custom built image with lldpad
+      image: frr-with-lldp:latest # Custom built image with FRR & lldpad
 
   nodes:
     leaf1:  { kind: srl, group: leaves, startup-config: auto-leaf.cfg.json }
