@@ -100,7 +100,7 @@ ipv4 { }
 ipv6 { }
 /interface lo0 subinterface 0 ipv4 address 100.1.0.1/32
 /network-instance default
-interface ethernet-1/1.0 bgp-unnumbered-peer-as external
+interface ethernet-1/1.0 bgp-unnumbered peer-as external
 protocols experimental-frr
 admin-state enable
 router-id 1.1.0.1
@@ -122,7 +122,7 @@ ipv4 { }
 ipv6 { }
 /interface lo0 subinterface 0 ipv4 address 100.1.1.1/32
 /network-instance default
-interface ethernet-1/1.0 bgp-unnumbered-peer-as external
+interface ethernet-1/1.0 bgp-unnumbered peer-as external
 protocols experimental-frr
 admin-state enable
 router-id 1.1.1.1
@@ -256,10 +256,10 @@ Spine:
 A:spine1# vtysh network-instance default
 
 spine1# conf t
-spine1(config)# int eigrp-e1 
+spine1(config)# int eigrp-e1
 spine1(config-if)# ip address 10.0.0.0/31
 spine1(config-if)# end
-spine1# show ip eigrp neighbors 
+spine1# show ip eigrp neighbors
 
 EIGRP neighbors for AS(65000)
 
@@ -272,12 +272,12 @@ Leaf:
 A:leaf1# vtysh network-instance default
 
 leaf1# conf t
-leaf1(config)# int eigrp-e1 
+leaf1(config)# int eigrp-e1
 leaf1(config-if)# ip address 10.0.0.1/31
 leaf1(config-if)# end
-leaf1# ping 10.0.0.0 
+leaf1# ping 10.0.0.0
   <cr>  
-leaf1# ping 10.0.0.0 
+leaf1# ping 10.0.0.0
 PING 10.0.0.0 (10.0.0.0) 56(84) bytes of data.
 64 bytes from 10.0.0.0: icmp_seq=1 ttl=64 time=0.074 ms
 64 bytes from 10.0.0.0: icmp_seq=2 ttl=64 time=0.083 ms
@@ -288,7 +288,7 @@ PING 10.0.0.0 (10.0.0.0) 56(84) bytes of data.
 --- 10.0.0.0 ping statistics ---
 5 packets transmitted, 5 received, 0% packet loss, time 4094ms
 rtt min/avg/max/mdev = 0.056/0.071/0.083/0.011 ms
-leaf1# show ip eigrp neighbors 
+leaf1# show ip eigrp neighbors
 
 EIGRP neighbors for AS(65000)
 
@@ -337,4 +337,3 @@ It is also possible to dynamically assign /31 IPv4 addresses to the interfaces t
 For example, if a spine is 1.1.0.0 and a leaf is 1.1.1.0, the difference is 256. 1.1.0.1 and 1.1.1.1 would have the same difference, so the index to use could be calculated as the difference between router-ids plus the last octet of the lowest one.
 * It may be easier to use locally unique private addresses, disabling duplicate address detection
 * Alternatively, the /31 corresponding to the neighbor's router ID can be used ( if router ID is 1.1.1.1, assign 1.1.1.0/31 ). This can work if different tiers differ in higher octets ( e.g. spine=1.1.0.x, leaf=1.1.1.x ) such that the local router's ID is not "close" to its peer
-
