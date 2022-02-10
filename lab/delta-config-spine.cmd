@@ -27,10 +27,14 @@ set /system gnmi-server unix-socket admin-state enable
 /network-instance default {
         admin-state enable
         interface ethernet-1/1.0 {
-            bgp-unnumbered-peer-as external
+            bgp-unnumbered {
+             peer-as external
+            }
         }
         interface ethernet-1/2.0 {
-            bgp-unnumbered-peer-as external
+            bgp-unnumbered {
+             peer-as external
+            }
         }
         interface system0.0 {
         }

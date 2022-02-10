@@ -277,11 +277,9 @@ module srl-frr-agent {
 
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:interface" { // list
 
-      leaf bgp-unnumbered-peer-as {
-          description "Initiate a BGP unnumbered peering session on this interface,
-                       expecting the given peer AS: 'external' or 'internal' for auto-discovery
-                       or a number between 1..4294967295";
-          type peer-as-spec;
+      container bgp-unnumbered {
+          presence "BGP unnumbered functionality";
+          description "Initiate a BGP unnumbered peering session on this interface";
 
           must "../../srl_nokia-netinst:protocols/experimental-frr" {
             error-message "BGP unnumbered requires experimental-frr to be configured for this network-instance";
@@ -302,6 +300,27 @@ module srl-frr-agent {
           //}
           must "/srl_nokia-if:interface[srl_nokia-if:name=substring-before(../name, '.')]/srl_nokia-if:subinterface[srl_nokia-if:index=substring-after(../name, '.')]/srl_nokia-if-ip:ipv6" {
             error-message "BGP unnumbered interfaces must have ipv6 enabled";
+          }
+
+          leaf peer-as {
+           type peer-as-spec;
+           description "Expecting the given peer AS: 'external' or 'internal' for auto-discovery
+                        or a number between 1..4294967295";
+          }
+
+          container status {
+           config false;
+
+           leaf discovered-peer-as {
+            type uint32 {
+             range "1..4294967295";
+            }
+           }
+
+           leaf oper-state {
+            type string;
+            default "down";
+           }
           }
        }
 

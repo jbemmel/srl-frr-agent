@@ -604,23 +604,16 @@ def Handle_Notification(obj, state):
                 ni['config'] = params
 
         # Tends to come first (always?) when full blob is configured
-        elif obj.config.key.js_path == ".network_instance.interface":
-          if obj.config.op != 2: # Skip deletes, TODO process them?
+        elif obj.config.key.js_path == ".network_instance.interface.bgp_unnumbered":
+          if obj.config.op != 2: # Skip deletes, TODO process them
             data = get_data_as_json()
 
-            # 'interface' only present when bgp-unnumbered param is set
             peer_as = None
-            if 'interface' in data:
-               _i = data['interface']
-               if 'bgp_unnumbered_peer_as_enum' in _i:
-                  # 'external' or 'internal', remove 'BGP_UNNUMBERED_PEER_AS_ENUM_'
-                  peer_as = _i['bgp_unnumbered_peer_as_enum'][28:]
-               elif 'bgp_unnumbered_peer_as_uint32' in _i:
-                  peer_as = _i['bgp_unnumbered_peer_as_uint32']['value']
-
-               # Can show up here, but also below in .openfabric (duplicate?)
-               if 'openfabric' in _i:
-                  logging.info(f"TODO: process openfabric interface config : {_i['openfabric']}")
+            if 'peer_as_enum' in data:
+              # 'external' or 'internal', remove 'PEER_AS_ENUM_'
+              peer_as = data['peer_as_enum'][13:]
+            elif 'peer_as_uint32' in data:
+              peer_as = data['peer_as_uint32']['value']
 
             intf = obj.config.key.keys[1].replace("ethernet-","e").replace("/","-")
 
