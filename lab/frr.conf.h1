@@ -1,0 +1,48 @@
+frr defaults datacenter
+hostname h1
+log syslog informational
+service integrated-vtysh-config
+!
+interface lo
+ ip address 1.0.0.1/32
+!
+interface eth1
+ ip address 192.168.127.5/31
+ evpn mh uplink
+!
+router bgp 65534
+ bgp router-id 1.0.0.1
+ neighbor overlay peer-group
+ neighbor overlay remote-as 65534
+ neighbor overlay advertisement-interval 0
+ neighbor overlay timers 3 9
+ neighbor overlay timers connect 10
+ ! neighbor underlay peer-group
+ ! neighbor underlay remote-as 65534
+ ! neighbor underlay local-as 4200000002 no-prepend replace-as
+ ! neighbor underlay advertisement-interval 0
+ ! neighbor underlay timers 3 9
+ ! neighbor underlay timers connect 10
+ ! neighbor 1.1.0.1 peer-group overlay
+ neighbor 192.168.127.4 peer-group overlay
+ !
+ address-family ipv4 unicast
+  neighbor overlay activate
+  redistribute connected route-map EXPORT_LOOPBACK
+ exit-address-family
+ !
+ address-family l2vpn evpn
+  neighbor overlay activate
+  advertise-all-vni
+  ! vni 4094
+   ! rd 1.1.0.1:0
+  ! exit-vni
+ exit-address-family
+!
+route-map EXPORT_LOOPBACK deny 100
+!
+route-map EXPORT_LOOPBACK permit 1
+ match interface lo
+!
+line vty
+!

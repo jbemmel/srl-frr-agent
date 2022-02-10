@@ -26,8 +26,18 @@ topology:
     spine1: { kind: srl, group: spines, startup-config: auto-spine.cfg.json }
     spine2: { kind: srl, group: spines, startup-config: auto-spine.cfg.json }
 
-    h1: { kind: linux, group: hosts }
-    h2: { kind: linux, group: hosts }
+    h1:
+     kind: linux
+     group: hosts
+     binds:
+     # - interfaces.h1:/etc/network/interfaces
+     - frr.conf.h1:/etc/frr/frr.conf
+
+    h2:
+     kind: linux
+     group: hosts
+     # binds:
+     # - interfaces.h2:/etc/network/interfaces
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
@@ -37,6 +47,6 @@ topology:
     - endpoints: ["leaf2:e1-2","spine2:e1-2"]
     - endpoints: ["leaf3:e1-2","spine2:e1-3"]
 
-    - endpoints: ["h1:e1-1","leaf1:e1-3"] # This currently assigns router ID .3, based on leaf port
-    - endpoints: ["h2:e1-1","leaf2:e1-3"] # LAG
-    - endpoints: ["h2:e1-2","leaf3:e1-3"]
+    - endpoints: ["h1:eth1","leaf1:e1-3"] # This currently assigns router ID .3, based on leaf port
+    - endpoints: ["h2:eth1","leaf2:e1-3"] # LAG
+    - endpoints: ["h2:eth2","leaf3:e1-3"]

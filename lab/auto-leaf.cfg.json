@@ -4,6 +4,9 @@
     "evpn": {
       "model": "symmetric-irb",
       "auto-lags": "encoded-ipv6"
+    },
+    "gateway": {
+      "ipv4": "10.10.10.1/24"
     }
   },
   "srl_nokia-acl:acl": {
