@@ -37,7 +37,7 @@ class PrefixManager:
         telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(self.channel)
         telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
         telemetry_info = telemetry_update_request.state.add()
-        telemetry_info.key.js_path = f'.network_instance{{.name=="{self.network_instance}"}}.protocols.experimental_frr' + js_path
+        telemetry_info.key.js_path = f'.network_instance{{.name=="{self.network_instance}"}}' + js_path
         telemetry_info.data.json_content = json.dumps(js_data)
         logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
         telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=self.metadata)
@@ -175,7 +175,7 @@ class PrefixManager:
         logging.info(f"RouteAddOrUpdate RESPONSE:: {route_response.status} " +
                                                  f"{route_response.error_str}" )
 
-        self.Add_Telemetry( '.stats.routes', self.stats )
+        self.Add_Telemetry( '.protocols.experimental_frr.stats.routes', self.stats )
         return route_response.status == 0
 
     def del_Route( self, netlink_msg ):
@@ -237,9 +237,16 @@ class PrefixManager:
         self.NDK_AddOrUpdateNextHopGroup( interface )
         peer_data = {
           'last_updated': { 'value': datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ") },
-          'peer_as': { 'value': peer_as }
+          'peer_as': { 'value': peer_as },
         }
-        self.Add_Telemetry( f'.peer{{.router_id=="{peer_id}"}}', peer_data )
+        self.Add_Telemetry( f'.protocols.experimental_frr.peer{{.router_id=="{peer_id}"}}', peer_data )
+        peer_data.update( {
+          'discovered_peer_as': { 'value': peer_as },
+          'router_id': { 'value': peer_id },
+          'oper_state': { 'value': 'up' },
+        } )
+        ifname = interface.replace('-','/').replace('e','ethernet-')
+        self.Add_Telemetry( f'.interface{{.name=="{ifname}"}}.bgp_unnumbered.status', peer_data )
 
         # Also update any ECMP groups that this interface belongs to
         for nhg_name in list(self.unresolved_ecmp_groups.keys()):
