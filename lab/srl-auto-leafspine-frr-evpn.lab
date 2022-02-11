@@ -36,8 +36,9 @@ topology:
     h2:
      kind: linux
      group: hosts
-     # binds:
+     binds:
      # - interfaces.h2:/etc/network/interfaces
+     - frr.conf.h2:/etc/frr/frr.conf
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
