@@ -80,7 +80,8 @@ topology:
       #mgmt_ipv6: 2001:172:20:20::12
       ports:
         - 8086:8086
-#      env:
+      env:
+       INFLUXDB_DB: gnmic
 #       DOCKER_INFLUXDB_INIT_MODE: setup
 #       DOCKER_INFLUXDB_INIT_USERNAME: srlinux
 #       DOCKER_INFLUXDB_INIT_PASSWORD: srlinux
