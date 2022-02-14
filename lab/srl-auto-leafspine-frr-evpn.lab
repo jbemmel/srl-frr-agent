@@ -80,12 +80,12 @@ topology:
       #mgmt_ipv6: 2001:172:20:20::12
       ports:
         - 8086:8086
-      env:
-       DOCKER_INFLUXDB_INIT_MODE: setup
-       DOCKER_INFLUXDB_INIT_USERNAME: srlinux
-       DOCKER_INFLUXDB_INIT_PASSWORD: srlinux
-       DOCKER_INFLUXDB_INIT_ORG: srlinux
-       DOCKER_INFLUXDB_INIT_BUCKET: telegraf
+#      env:
+#       DOCKER_INFLUXDB_INIT_MODE: setup
+#       DOCKER_INFLUXDB_INIT_USERNAME: srlinux
+#       DOCKER_INFLUXDB_INIT_PASSWORD: srlinux
+#       DOCKER_INFLUXDB_INIT_ORG: srlinux
+#       DOCKER_INFLUXDB_INIT_BUCKET: telegraf
 
     grafana: # Added, connect via mgmt network
       kind: linux

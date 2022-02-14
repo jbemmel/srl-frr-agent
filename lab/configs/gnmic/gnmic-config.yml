@@ -112,7 +112,7 @@ outputs:
     type: influxdb
     url: http://clab-auto-frr-evpn-lab-influxdb:8086
     bucket: telegraf # db name
-    # token: gnmic:gnmic # username:password
+    token: gnmic:gnmic # username:password
     metric-prefix: gnmic
     batch-size: 1000
     flush-timer: 10s
