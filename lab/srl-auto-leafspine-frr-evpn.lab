@@ -75,7 +75,7 @@ topology:
 
     influxdb: # Added, connect via mgmt network
       kind: linux
-      image: influxdb:1.8
+      image: influxdb:2.1.1
       #mgmt_ipv4: 171.0.0.52 # Pick a fixed IP
       #mgmt_ipv6: 2001:172:20:20::12
       ports:
