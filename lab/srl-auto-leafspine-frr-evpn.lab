@@ -42,12 +42,14 @@ topology:
      # - interfaces.h2:/etc/network/interfaces
      - frr.conf.h2:/etc/frr/frr.conf
 
+    # Test: curl 'http://172.20.20.10:8080/update?secret=SRL_rules&domain=leaf1&addr=1.2.3.4'
+    #       dig @172.20.20.10 leaf1.demo.srlinux.net.
     dyndns:
      kind: linux
      image: davd/docker-ddns:latest
      mgmt_ipv4: 172.20.20.10
      env:
-      SHARED_SECRET: "SRL rules"
+      SHARED_SECRET: "SRL_rules"
       ZONE: "demo.srlinux.net"
       RECORD_TTL: 3600
 
