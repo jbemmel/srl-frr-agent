@@ -232,7 +232,7 @@ Preference values are configurable for IBGP or EBGP, both default 170. Multiple 
 
 ## The benefits of numbered BGP unnumbered
 
-In the current 21.11.2 version, this agent configures a static IPv6 address on each interface in addition to the auto-assigned one. While this may seem redundant and "inefficient", consider the following:
+In the current 21.11.2 version, this agent configures a static IPv6 address on each interface in addition to the auto-assigned link-local one. While this may seem redundant and "inefficient", consider the following:
 
 ```
 leaf2$ ping6 2001::1:1:0:1 -I 2001::1:1:0:2
