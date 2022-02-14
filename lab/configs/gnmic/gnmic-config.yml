@@ -111,7 +111,7 @@ outputs:
   influxdb-output:
     type: influxdb
     url: http://clab-auto-frr-evpn-lab-influxdb:8086
-    bucket: telegraf # db name
+    bucket: gnmic # db name
     token: gnmic:gnmic # username:password
     metric-prefix: gnmic
     batch-size: 1000
