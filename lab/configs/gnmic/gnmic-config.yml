@@ -110,7 +110,7 @@ outputs:
   # JvB: added, for non-numeric data
   influxdb-output:
     type: influxdb
-    url: http://clab-srl-docter-lab-influxdb:8086
+    url: http://clab-auto-frr-evpn-lab-influxdb:8086
     bucket: telegraf # db name
     # token: gnmic:gnmic # username:password
     metric-prefix: gnmic
