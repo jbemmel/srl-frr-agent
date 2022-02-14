@@ -70,7 +70,8 @@ subscriptions:
     paths:
       - /network-instance[name=*]/interface[name=ethernet-1/*]/
     mode: stream
-    stream-mode: on_change
+    stream-mode: sample
+    sample-interval: 20s
     
 #  demo_docter-agent:
 #    paths:
