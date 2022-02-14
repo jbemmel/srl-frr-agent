@@ -107,15 +107,15 @@ outputs:
     event-processors:
       - trim-prefixes
 
-  ## JvB: added, for non-numeric data
-  #influxdb-output:
-  #  type: influxdb
-  #  url: http://clab-srl-docter-lab-influxdb:8086
-  #  bucket: telegraf # db name
-  #  # token: gnmic:gnmic # username:password
-  #  metric-prefix: gnmic
-  #  batch-size: 1000
-  #  flush-timer: 10s
+  # JvB: added, for non-numeric data
+  influxdb-output:
+    type: influxdb
+    url: http://clab-srl-docter-lab-influxdb:8086
+    bucket: telegraf # db name
+    # token: gnmic:gnmic # username:password
+    metric-prefix: gnmic
+    batch-size: 1000
+    flush-timer: 10s
  
   # stdout:
   #   type: file

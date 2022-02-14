@@ -73,6 +73,31 @@ topology:
         - 9090:9090 
 
 
+    influxdb: # Added, connect via mgmt network
+      kind: linux
+      image: influxdb:1.8
+      #mgmt_ipv4: 171.0.0.52 # Pick a fixed IP
+      #mgmt_ipv6: 2001:172:20:20::12
+      ports:
+        - 8086:8086
+
+
+    grafana: # Added, connect via mgmt network
+      kind: linux
+      image: grafana/grafana:8.1.8
+      env:
+        #http_proxy: http://135.245.48.34:8000
+        #https_proxy: http://135.245.48.34:8000
+        GF_INSTALL_PLUGINS: agenty-flowcharting-panel,agenty-flowcharting-panel
+      binds:
+        - configs/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml:ro
+        - configs/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+        - configs/grafana/dashboards:/var/lib/grafana/dashboards
+      #mgmt_ipv4: 171.0.0.50 # Pick a fixed IP
+      #mgmt_ipv6: 2001:172:20:20::10
+      ports:
+        - 3000:3000
+
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
     - endpoints: ["leaf2:e1-1","spine1:e1-2"]
