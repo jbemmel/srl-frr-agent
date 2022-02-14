@@ -5,7 +5,7 @@ datasources:
   - name: InfluxDB
     type: influxdb
     url: http://clab-auto-frr-evpn-lab-influxdb:8086
-    database: telegraf
+    database: gnmic
     
   - name: Prometheus
     type: prometheus
