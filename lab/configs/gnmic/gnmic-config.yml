@@ -65,6 +65,12 @@ subscriptions:
     mode: stream
     stream-mode: sample
     sample-interval: 20s
+
+  srl_bgp-unnumbered:
+    paths:
+      - /network-instance[name=*]/bgp-unnumbered/
+    mode: stream
+    stream-mode: on_change
     
 #  demo_docter-agent:
 #    paths:
