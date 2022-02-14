@@ -68,7 +68,7 @@ subscriptions:
 
   srl_bgp-unnumbered:
     paths:
-      - /network-instance[name=*]/bgp-unnumbered/
+      - /network-instance[name=*]/interface[name=ethernet-1/*]/
     mode: stream
     stream-mode: on_change
     
