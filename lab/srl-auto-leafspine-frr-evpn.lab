@@ -53,6 +53,26 @@ topology:
       ZONE: "demo.srlinux.net"
       RECORD_TTL: 3600
 
+  ######## TELEMETRY STACK ########
+
+
+      gnmic:
+      kind: linux
+      image: ghcr.io/karimra/gnmic:0.18.0
+      binds:
+        - configs/gnmic/gnmic-config.yml:/gnmic-config.yml:ro
+      cmd: --config /gnmic-config.yml --log subscribe
+
+    prometheus:
+      kind: linux
+      image: prom/prometheus:v2.23.0
+      binds:
+        - configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      cmd: --config.file=/etc/prometheus/prometheus.yml
+      ports:
+        - 9090:9090 
+
+
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
     - endpoints: ["leaf2:e1-1","spine1:e1-2"]
