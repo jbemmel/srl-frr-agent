@@ -4,9 +4,9 @@ apiVersion: 1
 datasources:
   - name: InfluxDB
     type: influxdb
-    url: http://influxdb:8086
+    url: http://clab-auto-frr-evpn-lab-influxdb:8086
     database: telegraf
     
   - name: Prometheus
     type: prometheus
-    url: http://prometheus:9090
+    url: http://clab-auto-frr-evpn-lab-prometheus:9090
