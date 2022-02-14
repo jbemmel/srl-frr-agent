@@ -1,0 +1,127 @@
+# Copyright 2020 Nokia
+# Licensed under the BSD 3-Clause License.
+# SPDX-License-Identifier: BSD-3-Clause
+
+username: admin
+password: admin
+port: 57400
+timeout: 10s
+skip-verify: true
+encoding: json_ietf
+
+targets:
+  clab-auto-frr-evpn-lab-leaf1:
+  clab-auto-frr-evpn-lab-leaf2:
+  clab-auto-frr-evpn-lab-leaf3:
+  clab-auto-frr-evpn-lab-spine1:
+  clab-auto-frr-evpn-lab-spine2:
+
+subscriptions:
+  srl_if_stats:
+    paths:
+      - /interface[name=ethernet-1/*]/statistics
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+
+  srl_cpu:
+    paths:
+      - /platform/control[slot=*]/cpu[index=all]/total
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+
+  srl_mem:
+    paths:
+      - /platform/control[slot=*]/memory
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+
+  srl_bgp_stats:
+    paths:
+      - /network-instance[name=*]/protocols/bgp/statistics
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+
+  srl_ipv4_routes:
+    paths:
+      - /network-instance[name=*]/route-table/ipv4-unicast/statistics/
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+
+  srl_ipv6_routes:
+    paths:
+      - /network-instance[name=*]/route-table/ipv6-unicast/statistics/
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+
+  srl_apps:
+    paths:
+      - /system/app-management/application[name=*]
+    mode: stream
+    stream-mode: sample
+    sample-interval: 20s
+    
+#  demo_docter-agent:
+#    paths:
+#      - /docter-agent/metrics
+#    mode: stream
+#    stream-mode: on_change  
+    
+#  srl_docter-agent:
+#    paths:
+#      - /docter-agent
+#      - /docter-agent/intensive-care/statistics/report
+#    mode: stream
+#    stream-mode: sample
+#    sample-interval: 5s 
+
+#  srl_docter-agent2:
+#    paths:
+#      - /docter-agent/grafana-test
+#    mode: stream
+#    stream-mode: sample
+#    sample-interval: 5s 
+      
+
+outputs:
+  prom:
+    type: prometheus
+    listen: :9273
+    path: /metrics
+    metric-prefix: gnmic
+    append-subscription-name: true
+    export-timestamps: true
+    debug: false
+    event-processors:
+      - trim-prefixes
+
+  ## JvB: added, for non-numeric data
+  #influxdb-output:
+  #  type: influxdb
+  #  url: http://clab-srl-docter-lab-influxdb:8086
+  #  bucket: telegraf # db name
+  #  # token: gnmic:gnmic # username:password
+  #  metric-prefix: gnmic
+  #  batch-size: 1000
+  #  flush-timer: 10s
+ 
+  # stdout:
+  #   type: file
+  #   file-type: stdout
+  #   event-processors:
+  #     - proc-convert-strings-to-int
+  #     - trim-prefixes
+
+processors:
+  trim-prefixes:
+    event-strings:
+      value-names:
+        - ".*"
+      transforms:
+        - path-base:
+            apply-on: "name"

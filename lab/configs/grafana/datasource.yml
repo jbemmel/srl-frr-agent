@@ -1,0 +1,12 @@
+# config file version
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    url: http://influxdb:8086
+    database: telegraf
+    
+  - name: Prometheus
+    type: prometheus
+    url: http://prometheus:9090
