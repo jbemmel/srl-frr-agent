@@ -295,7 +295,7 @@
               "aggregation": "current",
               "alias": "Leaf 1 CPU Status",
               "colors": [
-                "#73BF69",
+                "#5794F2",
                 "#F2CC0C",
                 "#FA6400",
                 "#C4162A"
@@ -315,10 +315,10 @@
               "mappingType": 1,
               "metricType": "serie",
               "order": 3,
-              "overlayIcon": true,
-              "pattern": "status-detail-leaf1",
+              "overlayIcon": false,
+              "pattern": "status-detail-leaf1-eth-1/1.0",
               "rangeData": [],
-              "reduce": false,
+              "reduce": true,
               "refId": "A",
               "sanitize": false,
               "shapeData": [
@@ -332,8 +332,8 @@
               "shapeProp": "id",
               "shapeRegEx": true,
               "stringThresholds": [
-                "/yellow.*/",
-                "/orange.*/",
+                "/up.*/",
+                "/down.*/",
                 "/red.*/"
               ],
               "textData": [],
@@ -359,7 +359,7 @@
         },
         "targets": [
           {
-            "alias": "status-detail-leaf1",
+            "alias": "status-detail-leaf1-eth-1/1.0",
             "groupBy": [],
             "hide": false,
             "measurement": "srl_bgp-unnumbered",
@@ -379,6 +379,12 @@
             ],
             "tags": [
               {
+                "key": "source",
+                "operator": "=",
+                "value": "clab-auto-frr-evpn-lab-leaf1"
+              },
+              {
+                "condition": "AND",
                 "key": "interface_name",
                 "operator": "=",
                 "value": "ethernet-1/1.0"
@@ -909,5 +915,5 @@
     "timezone": "",
     "title": "Intensive Care Troubleshooting",
     "uid": "rJH5HEVnz",
-    "version": 1
+    "version": 2
   }
