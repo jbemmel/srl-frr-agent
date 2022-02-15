@@ -28,7 +28,7 @@
         "fieldConfig": {
           "defaults": {
             "color": {
-              "mode": "thresholds"
+              "mode": "continuous-GrYlRd"
             },
             "custom": {
               "fillOpacity": 70,
@@ -39,58 +39,19 @@
                 "options": {
                   "green": {
                     "color": "green",
-                    "index": 0,
-                    "text": "OK"
+                    "index": 0
                   },
-                  "orange:Broadcast traffic out of physical links": {
-                    "color": "dark-orange",
-                    "index": 5,
-                    "text": "Broadcast traffic out of physical links T2"
+                  "orange": {
+                    "color": "orange",
+                    "index": 2
                   },
-                  "orange:Unbalanced uplinks": {
-                    "color": "semi-dark-orange",
-                    "index": 10,
-                    "text": "Unbalanced uplinks"
+                  "red": {
+                    "color": "red",
+                    "index": 1
                   },
-                  "pending:Booting": {
-                    "color": "blue",
-                    "index": 7,
-                    "text": "Pending"
-                  },
-                  "red:Balanced uplinks": {
-                    "color": "light-red",
-                    "index": 2,
-                    "text": "Highly unbalanced uplinks"
-                  },
-                  "red:Broadcast traffic out of physical links": {
-                    "color": "semi-dark-red",
-                    "index": 6,
-                    "text": "Broadcast traffic out of physical links T3"
-                  },
-                  "red:Port down": {
-                    "color": "dark-red",
-                    "index": 1,
-                    "text": "Interface down"
-                  },
-                  "red:Unbalanced uplinks": {
-                    "color": "light-red",
-                    "index": 9,
-                    "text": "Unbalanced uplinks"
-                  },
-                  "yellow:Balanced uplinks": {
-                    "color": "semi-dark-yellow",
-                    "index": 3,
-                    "text": "Lightly unbalanced uplinks"
-                  },
-                  "yellow:Broadcast traffic out of physical links": {
-                    "color": "super-light-yellow",
-                    "index": 4,
-                    "text": "Broadcast traffic out of physical links T1"
-                  },
-                  "yellow:Unbalanced uplinks": {
+                  "yellow": {
                     "color": "yellow",
-                    "index": 8,
-                    "text": "Unbalanced uplinks"
+                    "index": 3
                   }
                 },
                 "type": "value"
@@ -100,11 +61,12 @@
               "mode": "absolute",
               "steps": [
                 {
-                  "color": "green",
+                  "color": "yellow",
                   "value": null
                 }
               ]
-            }
+            },
+            "unit": "string"
           },
           "overrides": []
         },
@@ -114,11 +76,11 @@
           "x": 0,
           "y": 0
         },
-        "id": 2,
+        "id": 7,
         "options": {
           "alignValue": "left",
           "legend": {
-            "displayMode": "list",
+            "displayMode": "table",
             "placement": "bottom"
           },
           "mergeValues": true,
@@ -128,10 +90,10 @@
             "mode": "single"
           }
         },
-        "pluginVersion": "8.1.1",
+        "pluginVersion": "7.3.7",
         "targets": [
           {
-            "alias": "$col $tag_source",
+            "alias": "$tag_source",
             "groupBy": [
               {
                 "params": [
@@ -140,166 +102,28 @@
                 "type": "tag"
               }
             ],
-            "measurement": "SRL_docter-agent-dataplane",
+            "measurement": "SRL_docter-agent-cpu",
             "orderByTime": "ASC",
             "policy": "default",
-            "query": "SELECT \"source\" AS \"Node\", \"/docter_agent:docter_agent/metrics/metric_status\" AS \"Overall Health\", \"/docter_agent:docter_agent/metrics/metric_cause\" AS \"Cause\", \"/docter_agent:docter_agent/metrics/metric/contribution_name-copy\" AS \"Name\" FROM \"SRL_docter-agent-dataplane\" WHERE $timeFilter",
             "queryType": "randomWalk",
-            "rawQuery": false,
             "refId": "A",
             "resultFormat": "time_series",
             "select": [
               [
                 {
                   "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
+                    "/docter_agent:docter_agent/metrics/metric_status"
                   ],
                   "type": "field"
-                },
-                {
-                  "params": [
-                    "Overall Health"
-                  ],
-                  "type": "alias"
                 }
               ]
             ],
             "tags": []
           }
         ],
-        "title": "Data Plane on change Health",
-        "type": "state-timeline"
-      },
-      {
-        "datasource": "InfluxDB",
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "custom": {
-              "fillOpacity": 70,
-              "lineWidth": 0
-            },
-            "mappings": [
-              {
-                "options": {
-                  "green": {
-                    "color": "green",
-                    "index": 0,
-                    "text": "OK"
-                  },
-                  "orange:BGP peering sessions": {
-                    "color": "dark-orange",
-                    "index": 4,
-                    "text": "One or more BGP in Open-Sent state"
-                  },
-                  "pending:Booting": {
-                    "color": "blue",
-                    "index": 5,
-                    "text": "Pending"
-                  },
-                  "red:BFD sessions (on OSPF)": {
-                    "color": "light-red",
-                    "index": 6,
-                    "text": "OSPF BFD Down"
-                  },
-                  "red:BGP peering sessions": {
-                    "color": "dark-red",
-                    "index": 1,
-                    "text": "BGP session down"
-                  },
-                  "red:Changes in BGP path counts": {
-                    "color": "light-red",
-                    "index": 2,
-                    "text": "Changes in BGP path counts"
-                  },
-                  "yellow:BGP peering sessions": {
-                    "color": "light-yellow",
-                    "index": 3,
-                    "text": "One or more BGP in Open-Confirm state"
-                  },
-                  "yellow:Changes in BGP path counts": {
-                    "color": "dark-yellow",
-                    "index": 7,
-                    "text": "Changes in BGP path counts"
-                  }
-                },
-                "type": "value"
-              }
-            ],
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            }
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 7,
-          "w": 12,
-          "x": 12,
-          "y": 0
-        },
-        "id": 4,
-        "options": {
-          "alignValue": "left",
-          "legend": {
-            "displayMode": "list",
-            "placement": "bottom"
-          },
-          "mergeValues": true,
-          "rowHeight": 0.9,
-          "showValue": "never",
-          "tooltip": {
-            "mode": "single"
-          }
-        },
-        "pluginVersion": "8.1.1",
-        "targets": [
-          {
-            "alias": "$col $tag_source",
-            "groupBy": [
-              {
-                "params": [
-                  "source"
-                ],
-                "type": "tag"
-              }
-            ],
-            "measurement": "SRL_docter-agent-controlplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "query": "SELECT \"source\" AS \"Node\", \"/docter_agent:docter_agent/metrics/metric_status\" AS \"Overall Health\", \"/docter_agent:docter_agent/metrics/metric_cause\" AS \"Cause\", \"/docter_agent:docter_agent/metrics/metric/contribution_name-copy\" AS \"Name\" FROM \"SRL_docter-agent-dataplane\" WHERE $timeFilter",
-            "queryType": "randomWalk",
-            "rawQuery": false,
-            "refId": "A",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                },
-                {
-                  "params": [
-                    "Overall Health"
-                  ],
-                  "type": "alias"
-                }
-              ]
-            ],
-            "tags": []
-          }
-        ],
-        "title": "Control Plane on change Health",
+        "timeFrom": null,
+        "timeShift": null,
+        "title": "SR Linux On change CPU Custom Threshold (80%) Monitoring",
         "type": "state-timeline"
       },
       {
@@ -330,21 +154,23 @@
         "format": "short",
         "graphId": "flowchart_23763571993",
         "gridPos": {
-          "h": 16,
-          "w": 24,
-          "x": 0,
-          "y": 7
+          "h": 17,
+          "w": 12,
+          "x": 12,
+          "y": 0
         },
-        "id": 7,
+        "id": 11,
         "newFlag": false,
         "rulesData": {
           "rulesData": [
             {
               "aggregation": "current",
-              "alias": "leaf 3 ethernet-1/2 status",
+              "alias": "Leaf 2 CPU Status",
               "colors": [
                 "#73BF69",
-                "#F2495C"
+                "#F2CC0C",
+                "#FA6400",
+                "#C4162A"
               ],
               "column": "Time",
               "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -362,7 +188,7 @@
               "metricType": "serie",
               "order": 1,
               "overlayIcon": true,
-              "pattern": "status-detail-leaf3",
+              "pattern": "status-detail-leaf2",
               "rangeData": [],
               "reduce": true,
               "refId": "A",
@@ -371,22 +197,24 @@
                 {
                   "colorOn": "a",
                   "hidden": false,
-                  "pattern": "153",
-                  "style": "strokeColor"
+                  "pattern": "145",
+                  "style": "fillColor"
                 }
               ],
               "shapeProp": "id",
               "shapeRegEx": true,
               "stringThresholds": [
-                "/.*ethernet-1/2.*oper-down.*/"
+                "/yellow.*/",
+                "/orange.*/",
+                "/red.*/"
               ],
               "textData": [],
-              "textProp": "id",
+              "textProp": "value",
               "textRegEx": true,
               "thresholds": [],
               "tooltip": true,
               "tooltipColors": true,
-              "tooltipLabel": "ethernet-1/2 status",
+              "tooltipLabel": "Leaf 2 CPU Status",
               "tooltipOn": "a",
               "tpDirection": "v",
               "tpGraph": false,
@@ -401,10 +229,12 @@
             },
             {
               "aggregation": "current",
-              "alias": "leaf 3 ethernet-1/1 status",
+              "alias": "Leaf 3 CPU Status",
               "colors": [
                 "#73BF69",
-                "#F2495C"
+                "#F2CC0C",
+                "#FA6400",
+                "#C4162A"
               ],
               "column": "Time",
               "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -431,22 +261,24 @@
                 {
                   "colorOn": "a",
                   "hidden": false,
-                  "pattern": "150",
-                  "style": "strokeColor"
+                  "pattern": "147",
+                  "style": "fillColor"
                 }
               ],
               "shapeProp": "id",
               "shapeRegEx": true,
               "stringThresholds": [
-                "/.*ethernet-1/1.*oper-down.*/"
+                "/yellow.*/",
+                "/orange.*/",
+                "/red.*/"
               ],
               "textData": [],
-              "textProp": "id",
+              "textProp": "value",
               "textRegEx": true,
               "thresholds": [],
               "tooltip": true,
               "tooltipColors": true,
-              "tooltipLabel": "ethernet-1/1 status",
+              "tooltipLabel": "Leaf 3 CPU Status",
               "tooltipOn": "a",
               "tpDirection": "v",
               "tpGraph": false,
@@ -461,10 +293,12 @@
             },
             {
               "aggregation": "current",
-              "alias": "leaf 2 ethernet-1/2 status",
+              "alias": "Leaf 1 CPU Status",
               "colors": [
                 "#73BF69",
-                "#F2495C"
+                "#F2CC0C",
+                "#FA6400",
+                "#C4162A"
               ],
               "column": "Time",
               "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -482,511 +316,9 @@
               "metricType": "serie",
               "order": 3,
               "overlayIcon": true,
-              "pattern": "status-detail-leaf2",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "152",
-                  "style": "strokeColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/.*ethernet-1/2.*oper-down.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "ethernet-1/2 status",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "leaf 2 ethernet-1/1 status",
-              "colors": [
-                "#73BF69",
-                "#F2495C"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 4,
-              "overlayIcon": true,
-              "pattern": "status-detail-leaf2",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "148",
-                  "style": "strokeColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/.*ethernet-1/1.*oper-down.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "ethernet-1/1 status",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "leaf 1 ethernet-1/1 status",
-              "colors": [
-                "#73BF69",
-                "#F2495C"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 5,
-              "overlayIcon": true,
               "pattern": "status-detail-leaf1",
               "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "149",
-                  "style": "strokeColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/.*ethernet-1/1.*oper-down.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "ethernet-1/1 status",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "leaf 1 ethernet-1/2 status",
-              "colors": [
-                "#73BF69",
-                "#F2495C"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 6,
-              "overlayIcon": true,
-              "pattern": "status-detail-leaf1",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "151",
-                  "style": "fillColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/.*ethernet-1/2.*oper-down.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "ethernet-1/2 status",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "dataplane_leaf2",
-              "colors": [
-                "#73BF69",
-                "#F2CC0C",
-                "#FA6400",
-                "#C4162A"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": true,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 7,
-              "overlayIcon": true,
-              "pattern": "dataplane_leaf2",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "145",
-                  "style": "fillColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/yellow.*/",
-                "/orange.*/",
-                "/red.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "dataplane_leaf3",
-              "colors": [
-                "#73BF69",
-                "#F2CC0C",
-                "#FA6400",
-                "#C4162A"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": true,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 8,
-              "overlayIcon": true,
-              "pattern": "dataplane_leaf3",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "147",
-                  "style": "fillColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/yellow.*/",
-                "/orange.*/",
-                "/red.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "controlplane_spine2",
-              "colors": [
-                "#73BF69",
-                "#5794F2",
-                "#f6a108",
-                "#FA6400",
-                "#FF7383"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": true,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 9,
-              "overlayIcon": true,
-              "pattern": "controlplane_spine2",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "144",
-                  "style": "fillColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/pending:Booting.*/",
-                "/yellow.*/",
-                "/orange.*/",
-                "/red.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "controlplane_spine1",
-              "colors": [
-                "#73BF69",
-                "#5794F2",
-                "#f6a108",
-                "#FA6400",
-                "#C4162A"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": true,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 10,
-              "overlayIcon": true,
-              "pattern": "controlplane_spine1",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "143",
-                  "style": "fillColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/pending:Booting.*/",
-                "/yellow.*/",
-                "/orange.*/",
-                "/red.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "dataplane_leaf1",
-              "colors": [
-                "#73BF69",
-                "#F2CC0C",
-                "#FA6400",
-                "#C4162A"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 11,
-              "overlayIcon": true,
-              "pattern": "dataplane_leaf1",
-              "rangeData": [],
-              "reduce": true,
+              "reduce": false,
               "refId": "A",
               "sanitize": false,
               "shapeData": [
@@ -1005,216 +337,12 @@
                 "/red.*/"
               ],
               "textData": [],
-              "textProp": "id",
+              "textProp": "value",
               "textRegEx": true,
               "thresholds": [],
               "tooltip": true,
               "tooltipColors": true,
-              "tooltipLabel": "",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "Unbalanced Uplinks Leaf1",
-              "colors": [
-                "#73BF69",
-                "#FADE2A",
-                "#FA6400"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 12,
-              "overlayIcon": true,
-              "pattern": "status-detail-leaf1",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "149",
-                  "style": "strokeColor"
-                },
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "151",
-                  "style": "strokeColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/Unbalanced uplinks:yellow.*/",
-                "/Unbalanced uplinks:orange.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "Uplink Balance",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "Unbalanced Uplinks Leaf2",
-              "colors": [
-                "#73BF69",
-                "#FADE2A",
-                "#FA6400"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 13,
-              "overlayIcon": true,
-              "pattern": "status-detail-leaf2",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "148",
-                  "style": "strokeColor"
-                },
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "152",
-                  "style": "strokeColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/Unbalanced uplinks:yellow.*/",
-                "/Unbalanced uplinks:orange.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "Uplink Balance",
-              "tooltipOn": "a",
-              "tpDirection": "v",
-              "tpGraph": false,
-              "tpGraphHigh": null,
-              "tpGraphLow": null,
-              "tpGraphScale": "linear",
-              "tpGraphSize": "100%",
-              "tpGraphType": "line",
-              "type": "string",
-              "unit": "short",
-              "valueData": []
-            },
-            {
-              "aggregation": "current",
-              "alias": "Unbalanced Uplinks Leaf3",
-              "colors": [
-                "#73BF69",
-                "#FADE2A",
-                "#FA6400"
-              ],
-              "column": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "eventData": [],
-              "eventProp": "id",
-              "eventRegEx": false,
-              "gradient": false,
-              "hidden": false,
-              "invert": true,
-              "linkData": [],
-              "linkProp": "id",
-              "linkRegEx": false,
-              "mappingType": 1,
-              "metricType": "serie",
-              "order": 14,
-              "overlayIcon": true,
-              "pattern": "status-detail-leaf3",
-              "rangeData": [],
-              "reduce": true,
-              "refId": "A",
-              "sanitize": false,
-              "shapeData": [
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "150",
-                  "style": "strokeColor"
-                },
-                {
-                  "colorOn": "a",
-                  "hidden": false,
-                  "pattern": "153",
-                  "style": "strokeColor"
-                }
-              ],
-              "shapeProp": "id",
-              "shapeRegEx": true,
-              "stringThresholds": [
-                "/Unbalanced uplinks:yellow.*/",
-                "/Unbalanced uplinks:orange.*/"
-              ],
-              "textData": [],
-              "textProp": "id",
-              "textRegEx": true,
-              "thresholds": [],
-              "tooltip": true,
-              "tooltipColors": true,
-              "tooltipLabel": "Uplink Balance",
+              "tooltipLabel": "Leaf 1 CPU Status",
               "tooltipOn": "a",
               "tpDirection": "v",
               "tpGraph": false,
@@ -1234,7 +362,7 @@
             "alias": "status-detail-leaf1",
             "groupBy": [],
             "hide": false,
-            "measurement": "SRL_docter-agent-dataplane",
+            "measurement": "srl_bgp-unnumbered",
             "orderByTime": "ASC",
             "policy": "default",
             "refId": "G",
@@ -1243,7 +371,7 @@
               [
                 {
                   "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-detail"
+                    "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/oper-state"
                   ],
                   "type": "field"
                 }
@@ -1251,175 +379,9 @@
             ],
             "tags": [
               {
-                "key": "source",
+                "key": "interface_name",
                 "operator": "=",
-                "value": "clab-srl-docter-lab-leaf1"
-              }
-            ]
-          },
-          {
-            "alias": "dataplane_leaf1",
-            "groupBy": [],
-            "measurement": "SRL_docter-agent-dataplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "queryType": "randomWalk",
-            "refId": "A",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                }
-              ]
-            ],
-            "tags": [
-              {
-                "key": "source",
-                "operator": "=",
-                "value": "clab-srl-docter-lab-leaf1"
-              }
-            ]
-          },
-          {
-            "alias": "dataplane_leaf2",
-            "groupBy": [],
-            "hide": false,
-            "measurement": "SRL_docter-agent-dataplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "queryType": "randomWalk",
-            "refId": "B",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                }
-              ]
-            ],
-            "tags": [
-              {
-                "key": "source",
-                "operator": "=",
-                "value": "clab-srl-docter-lab-leaf2"
-              }
-            ]
-          },
-          {
-            "alias": "dataplane_leaf3",
-            "groupBy": [],
-            "hide": false,
-            "measurement": "SRL_docter-agent-dataplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "queryType": "randomWalk",
-            "refId": "C",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                }
-              ]
-            ],
-            "tags": [
-              {
-                "key": "source",
-                "operator": "=",
-                "value": "clab-srl-docter-lab-leaf3"
-              }
-            ]
-          },
-          {
-            "alias": "controlplane_spine1",
-            "groupBy": [],
-            "hide": false,
-            "measurement": "SRL_docter-agent-controlplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "queryType": "randomWalk",
-            "refId": "D",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                }
-              ]
-            ],
-            "tags": [
-              {
-                "key": "source",
-                "operator": "=",
-                "value": "clab-srl-docter-lab-spine1"
-              }
-            ]
-          },
-          {
-            "alias": "controlplane_spine2",
-            "groupBy": [],
-            "hide": false,
-            "measurement": "SRL_docter-agent-controlplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "queryType": "randomWalk",
-            "refId": "E",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                }
-              ]
-            ],
-            "tags": [
-              {
-                "key": "source",
-                "operator": "=",
-                "value": "clab-srl-docter-lab-spine2"
-              }
-            ]
-          },
-          {
-            "alias": "leaf1-ports",
-            "groupBy": [],
-            "hide": false,
-            "measurement": "SRL_docter-agent-dataplane",
-            "orderByTime": "ASC",
-            "policy": "default",
-            "refId": "F",
-            "resultFormat": "time_series",
-            "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric/contribution_reports_1"
-                  ],
-                  "type": "field"
-                }
-              ]
-            ],
-            "tags": [
-              {
-                "key": "source",
-                "operator": "=",
-                "value": "clab-srl-docter-lab-leaf1"
+                "value": "ethernet-1/1.0"
               }
             ]
           },
@@ -1427,16 +389,16 @@
             "alias": "status-detail-leaf2",
             "groupBy": [],
             "hide": false,
-            "measurement": "SRL_docter-agent-dataplane",
+            "measurement": "SRL_docter-agent-cpu",
             "orderByTime": "ASC",
             "policy": "default",
-            "refId": "H",
+            "refId": "A",
             "resultFormat": "time_series",
             "select": [
               [
                 {
                   "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-detail"
+                    "/docter_agent:docter_agent/metrics/metric_status"
                   ],
                   "type": "field"
                 }
@@ -1454,16 +416,16 @@
             "alias": "status-detail-leaf3",
             "groupBy": [],
             "hide": false,
-            "measurement": "SRL_docter-agent-dataplane",
+            "measurement": "SRL_docter-agent-cpu",
             "orderByTime": "ASC",
             "policy": "default",
-            "refId": "I",
+            "refId": "B",
             "resultFormat": "time_series",
             "select": [
               [
                 {
                   "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-detail"
+                    "/docter_agent:docter_agent/metrics/metric_status"
                   ],
                   "type": "field"
                 }
@@ -1485,7 +447,111 @@
         "version": "0.9.0"
       },
       {
+        "aliasColors": {},
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "datasource": "Prometheus",
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 10,
+          "w": 12,
+          "x": 0,
+          "y": 7
+        },
+        "hiddenSeries": false,
+        "id": 4,
+        "legend": {
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "alertThreshold": true
+        },
+        "percentage": false,
+        "pluginVersion": "8.1.8",
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "gnmic_srl_cpu_instant{}",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "",
+            "refId": "B"
+          }
+        ],
+        "thresholds": [
+          {
+            "$$hashKey": "object:83",
+            "colorMode": "critical",
+            "fill": true,
+            "line": true,
+            "op": "gt",
+            "value": 80,
+            "yaxis": "left"
+          }
+        ],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Traditional Monitoring (sample interval:20s)",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "$$hashKey": "object:171",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": "100",
+            "min": "0",
+            "show": true
+          },
+          {
+            "$$hashKey": "object:172",
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
         "datasource": "InfluxDB",
+        "description": "",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -1493,7 +559,8 @@
             },
             "custom": {
               "align": "auto",
-              "displayMode": "auto"
+              "displayMode": "color-background",
+              "filterable": false
             },
             "mappings": [],
             "thresholds": {
@@ -1519,55 +586,31 @@
               "properties": [
                 {
                   "id": "custom.width",
-                  "value": 195
+                  "value": 212
                 }
               ]
             },
             {
               "matcher": {
                 "id": "byName",
-                "options": "source"
+                "options": "Node"
               },
               "properties": [
                 {
                   "id": "custom.width",
-                  "value": 229
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Overall Health"
-              },
-              "properties": [
-                {
-                  "id": "custom.width",
-                  "value": 215
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "alias 1"
-              },
-              "properties": [
-                {
-                  "id": "custom.width",
-                  "value": 163
+                  "value": 218
                 }
               ]
             }
           ]
         },
         "gridPos": {
-          "h": 8,
-          "w": 12,
+          "h": 6,
+          "w": 24,
           "x": 0,
-          "y": 23
+          "y": 17
         },
-        "id": 3,
+        "id": 9,
         "options": {
           "showHeader": true,
           "sortBy": [
@@ -1577,41 +620,19 @@
             }
           ]
         },
-        "pluginVersion": "8.1.6",
+        "pluginVersion": "8.1.8",
         "targets": [
           {
-            "alias": "$tag_source",
-            "groupBy": [
-              {
-                "params": [
-                  "source"
-                ],
-                "type": "tag"
-              }
-            ],
-            "measurement": "SRL_docter-agent-dataplane",
+            "groupBy": [],
+            "measurement": "SRL_docter-agent-cpu",
             "orderByTime": "ASC",
             "policy": "default",
-            "query": "SELECT \"source\" AS \"Node\", \"/docter_agent:docter_agent/metrics/metric_status\" AS \"Overall Health\", \"/docter_agent:docter_agent/metrics/metric_cause\" AS \"Cause\", \"/docter_agent:docter_agent/metrics/metric/contribution_name-copy\" AS \"Name\" FROM \"SRL_docter-agent-dataplane\" WHERE $timeFilter",
+            "query": "SELECT \"source\" AS \"Node\", \"/docter_agent:docter_agent/metrics/metric/contribution_reports_2\" AS \"CPU %\" FROM \"SRL_docter-agent-cpu\" WHERE $timeFilter",
             "queryType": "randomWalk",
-            "rawQuery": false,
+            "rawQuery": true,
             "refId": "A",
-            "resultFormat": "table",
+            "resultFormat": "logs",
             "select": [
-              [
-                {
-                  "params": [
-                    "/docter_agent:docter_agent/metrics/metric_status-summary"
-                  ],
-                  "type": "field"
-                },
-                {
-                  "params": [
-                    "alias"
-                  ],
-                  "type": "alias"
-                }
-              ],
               [
                 {
                   "params": [
@@ -1621,7 +642,7 @@
                 },
                 {
                   "params": [
-                    "alias"
+                    "CPU %"
                   ],
                   "type": "alias"
                 }
@@ -1630,19 +651,18 @@
             "tags": []
           }
         ],
-        "title": "Data Plane on change Health Log",
+        "title": "CPU per process",
+        "transformations": [],
         "type": "table"
       },
       {
         "datasource": "InfluxDB",
         "fieldConfig": {
           "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
             "custom": {
-              "align": "auto",
-              "displayMode": "auto"
+              "align": null,
+              "displayMode": "auto",
+              "filterable": false
             },
             "mappings": [],
             "thresholds": {
@@ -1675,49 +695,28 @@
             {
               "matcher": {
                 "id": "byName",
-                "options": "source"
+                "options": "Node"
               },
               "properties": [
                 {
                   "id": "custom.width",
-                  "value": 184
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Overall Health"
-              },
-              "properties": [
-                {
-                  "id": "custom.width",
-                  "value": 215
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Status"
-              },
-              "properties": [
-                {
-                  "id": "custom.width",
-                  "value": 301
+                  "value": 166
                 }
               ]
             }
           ]
         },
         "gridPos": {
-          "h": 10,
+          "h": 7,
           "w": 12,
-          "x": 12,
+          "x": 0,
           "y": 23
         },
-        "id": 5,
+        "id": 2,
+        "interval": "",
+        "maxDataPoints": 1,
         "options": {
+          "frameIndex": 1,
           "showHeader": true,
           "sortBy": [
             {
@@ -1726,24 +725,16 @@
             }
           ]
         },
-        "pluginVersion": "8.1.6",
+        "pluginVersion": "8.1.8",
         "targets": [
           {
-            "alias": "$tag_source",
-            "groupBy": [
-              {
-                "params": [
-                  "source"
-                ],
-                "type": "tag"
-              }
-            ],
-            "measurement": "SRL_docter-agent-controlplane",
+            "groupBy": [],
+            "measurement": "SRL_docter-agent-cpu",
             "orderByTime": "ASC",
             "policy": "default",
-            "query": "SELECT \"source\" AS \"Node\", \"/docter_agent:docter_agent/metrics/metric_status\" AS \"Overall Health\", \"/docter_agent:docter_agent/metrics/metric_cause\" AS \"Cause\", \"/docter_agent:docter_agent/metrics/metric/contribution_name-copy\" AS \"Name\" FROM \"SRL_docter-agent-dataplane\" WHERE $timeFilter",
+            "query": "SELECT \"source\" AS \"Node\", \"/docter_agent:docter_agent/metrics/metric_status-summary\" AS \"Status\" FROM \"SRL_docter-agent-cpu\" WHERE $timeFilter limit 3",
             "queryType": "randomWalk",
-            "rawQuery": false,
+            "rawQuery": true,
             "refId": "A",
             "resultFormat": "table",
             "select": [
@@ -1760,17 +751,135 @@
                   ],
                   "type": "alias"
                 }
-              ],
+              ]
+            ],
+            "tags": []
+          }
+        ],
+        "timeFrom": null,
+        "timeShift": null,
+        "title": "Latest Status",
+        "type": "table"
+      },
+      {
+        "datasource": "InfluxDB",
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": null,
+              "displayMode": "auto",
+              "filterable": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Time"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 184
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Node"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 210
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 12,
+          "x": 12,
+          "y": 23
+        },
+        "id": 5,
+        "options": {
+          "frameIndex": 1,
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "Time"
+            }
+          ]
+        },
+        "pluginVersion": "8.1.8",
+        "targets": [
+          {
+            "groupBy": [],
+            "measurement": "SRL_docter-agent-cpu",
+            "orderByTime": "ASC",
+            "policy": "default",
+            "query": "SELECT \"source\" AS \"Node\",  \"/docter_agent:docter_agent/metrics/metric_status-summary\" AS \"Consolidated State\" FROM \"SRL_docter-agent-cpu\" WHERE $timeFilter",
+            "queryType": "randomWalk",
+            "rawQuery": true,
+            "refId": "A",
+            "resultFormat": "table",
+            "select": [
               [
                 {
                   "params": [
-                    "/docter_agent:docter_agent/metrics/metric/contribution_reports_0"
+                    "/docter_agent:docter_agent/metrics/metric_cause"
                   ],
                   "type": "field"
                 },
                 {
                   "params": [
-                    "Value"
+                    "Cause"
+                  ],
+                  "type": "alias"
+                }
+              ],
+              [
+                {
+                  "params": [
+                    "/docter_agent:docter_agent/metrics/metric/contribution_status"
+                  ],
+                  "type": "field"
+                },
+                {
+                  "params": [
+                    "Status"
+                  ],
+                  "type": "alias"
+                }
+              ],
+              [
+                {
+                  "params": [
+                    "/docter_agent:docter_agent/metrics/metric_status-summary"
+                  ],
+                  "type": "field"
+                },
+                {
+                  "params": [
+                    "Status"
                   ],
                   "type": "alias"
                 }
@@ -1779,7 +888,9 @@
             "tags": []
           }
         ],
-        "title": "Control Plane on change Health Log",
+        "timeFrom": null,
+        "timeShift": null,
+        "title": "Status History",
         "type": "table"
       }
     ],
@@ -1796,7 +907,7 @@
     },
     "timepicker": {},
     "timezone": "",
-    "title": "General Health",
-    "uid": "ovcGxWInz",
+    "title": "Intensive Care Troubleshooting",
+    "uid": "rJH5HEVnz",
     "version": 1
   }
