@@ -250,7 +250,7 @@ PING 2001::1:1:0:1(2001::1:1:0:1) from 2001::1:1:0:2 : 56 data bytes
 
 rtt min/avg/max/mdev = 15.101/17.279/19.105/1.653 ms
 
-leaf2$ traceroute6 2001::1:1:0:1 -s 2001::1:1:0:2
+leaf2$ traceroute6 2001::1:1:0:1 -s 2001::1:1:0:2 -n
 
 traceroute to 2001::1:1:0:1 (2001::1:1:0:1), 30 hops max, 80 byte packets
 
