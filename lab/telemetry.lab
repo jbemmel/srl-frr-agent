@@ -1,0 +1,51 @@
+name: telemetry-stack
+
+topology:
+  nodes:
+  ######## TELEMETRY STACK ########
+    gnmic:
+      kind: linux
+      image: ghcr.io/karimra/gnmic:0.22.1
+      binds:
+        - configs/gnmic/gnmic-config.yml:/gnmic-config.yml:ro
+      cmd: --config /gnmic-config.yml --log subscribe
+
+    prometheus:
+      kind: linux
+      image: prom/prometheus:v2.23.0
+      binds:
+        - configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      cmd: --config.file=/etc/prometheus/prometheus.yml
+      ports:
+        - 9090:9090
+
+    influxdb: # Added, connect via mgmt network
+      kind: linux
+      image: influxdb:1.8
+      #mgmt_ipv4: 171.0.0.52 # Pick a fixed IP
+      #mgmt_ipv6: 2001:172:20:20::12
+      ports:
+        - 8086:8086
+      env:
+       INFLUXDB_DB: gnmic
+#       DOCKER_INFLUXDB_INIT_MODE: setup
+#       DOCKER_INFLUXDB_INIT_USERNAME: srlinux
+#       DOCKER_INFLUXDB_INIT_PASSWORD: srlinux
+#       DOCKER_INFLUXDB_INIT_ORG: srlinux
+#       DOCKER_INFLUXDB_INIT_BUCKET: telegraf
+
+    grafana: # Added, connect via mgmt network
+      kind: linux
+      image: grafana/grafana:8.1.8
+      env:
+        #http_proxy: http://135.245.48.34:8000
+        #https_proxy: http://135.245.48.34:8000
+        GF_INSTALL_PLUGINS: agenty-flowcharting-panel,agenty-flowcharting-panel
+      binds:
+        - configs/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml:ro
+        - configs/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+        - configs/grafana/dashboards:/var/lib/grafana/dashboards
+      #mgmt_ipv4: 171.0.0.50 # Pick a fixed IP
+      #mgmt_ipv6: 2001:172:20:20::10
+      ports:
+        - 3000:3000
