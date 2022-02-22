@@ -126,70 +126,6 @@
           },
           {
             "aggregation": "current",
-            "alias": "Leaf 2 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 2,
-            "overlayIcon": false,
-            "pattern": "leaf2-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "145",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/orange.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 2 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
             "alias": "Leaf 3 BGP Status",
             "colors": [
               "#5794F2",
@@ -211,7 +147,7 @@
             "linkRegEx": false,
             "mappingType": 1,
             "metricType": "serie",
-            "order": 3,
+            "order": 2,
             "overlayIcon": false,
             "pattern": "leaf3-eth1/1.0",
             "rangeData": [],
@@ -275,11 +211,11 @@
             "linkRegEx": false,
             "mappingType": 1,
             "metricType": "serie",
-            "order": 4,
+            "order": 3,
             "overlayIcon": true,
-            "pattern": "leaf1-eth1/1.0",
+            "pattern": "leaf1-eth1",
             "rangeData": [],
-            "reduce": false,
+            "reduce": true,
             "refId": "A",
             "sanitize": false,
             "shapeData": [
@@ -304,6 +240,134 @@
             "tooltip": true,
             "tooltipColors": true,
             "tooltipLabel": "Leaf 1 Eth-1/1.0 BGP Status",
+            "tooltipOn": "a",
+            "tpDirection": "v",
+            "tpGraph": false,
+            "tpGraphHigh": null,
+            "tpGraphLow": null,
+            "tpGraphScale": "linear",
+            "tpGraphSize": "100%",
+            "tpGraphType": "line",
+            "type": "string",
+            "unit": "short",
+            "valueData": []
+          },
+          {
+            "aggregation": "current",
+            "alias": "Copy of Leaf 1 BGP Status",
+            "colors": [
+              "#5794F2",
+              "#73BF69",
+              "#FA6400",
+              "#C4162A"
+            ],
+            "column": "Time",
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "eventData": [],
+            "eventProp": "id",
+            "eventRegEx": false,
+            "gradient": false,
+            "hidden": false,
+            "invert": true,
+            "linkData": [],
+            "linkProp": "id",
+            "linkRegEx": false,
+            "mappingType": 1,
+            "metricType": "serie",
+            "order": 4,
+            "overlayIcon": true,
+            "pattern": "leaf1-eth1/2.0",
+            "rangeData": [],
+            "reduce": true,
+            "refId": "A",
+            "sanitize": false,
+            "shapeData": [
+              {
+                "colorOn": "a",
+                "hidden": false,
+                "pattern": "149",
+                "style": "strokeColor"
+              }
+            ],
+            "shapeProp": "id",
+            "shapeRegEx": true,
+            "stringThresholds": [
+              "/up.*/",
+              "/orange.*/",
+              "/red.*/"
+            ],
+            "textData": [],
+            "textProp": "value",
+            "textRegEx": true,
+            "thresholds": [],
+            "tooltip": true,
+            "tooltipColors": true,
+            "tooltipLabel": "Leaf 1 Eth-1/1.0 BGP Status",
+            "tooltipOn": "a",
+            "tpDirection": "v",
+            "tpGraph": false,
+            "tpGraphHigh": null,
+            "tpGraphLow": null,
+            "tpGraphScale": "linear",
+            "tpGraphSize": "100%",
+            "tpGraphType": "line",
+            "type": "string",
+            "unit": "short",
+            "valueData": []
+          },
+          {
+            "aggregation": "current",
+            "alias": "Leaf 1 BGP Status",
+            "colors": [
+              "#5794F2",
+              "#73BF69",
+              "#FA6400",
+              "#C4162A"
+            ],
+            "column": "Time",
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "eventData": [],
+            "eventProp": "id",
+            "eventRegEx": false,
+            "gradient": false,
+            "hidden": false,
+            "invert": true,
+            "linkData": [],
+            "linkProp": "id",
+            "linkRegEx": false,
+            "mappingType": 1,
+            "metricType": "serie",
+            "order": 5,
+            "overlayIcon": true,
+            "pattern": "leaf1-eth1/1.0",
+            "rangeData": [],
+            "reduce": false,
+            "refId": "A",
+            "sanitize": false,
+            "shapeData": [
+              {
+                "colorOn": "a",
+                "hidden": false,
+                "pattern": "151",
+                "style": "strokeColor"
+              }
+            ],
+            "shapeProp": "id",
+            "shapeRegEx": true,
+            "stringThresholds": [
+              "/up.*/",
+              "/orange.*/",
+              "/red.*/"
+            ],
+            "textData": [],
+            "textProp": "value",
+            "textRegEx": true,
+            "thresholds": [],
+            "tooltip": true,
+            "tooltipColors": true,
+            "tooltipLabel": "Leaf 1 Eth-1/2.0 BGP Status",
             "tooltipOn": "a",
             "tpDirection": "v",
             "tpGraph": false,
@@ -415,6 +479,39 @@
               "key": "source",
               "operator": "=",
               "value": "clab-auto-frr-evpn-lab-leaf3"
+            }
+          ]
+        },
+        {
+          "alias": "leaf1-eth1/2.0",
+          "groupBy": [],
+          "hide": false,
+          "measurement": "srl_bgp-unnumbered",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "C",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/oper-state"
+                ],
+                "type": "field"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "interface_name",
+              "operator": "=",
+              "value": "ethernet-1/2.0"
+            },
+            {
+              "condition": "AND",
+              "key": "source",
+              "operator": "=",
+              "value": "clab-auto-frr-evpn-lab-leaf1"
             }
           ]
         }
