@@ -21,7 +21,6 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 3,
   "links": [],
   "panels": [
     {
@@ -50,7 +49,7 @@
         ]
       },
       "format": "short",
-      "graphId": "flowchart_11",
+      "graphId": "flowchart_23763571993",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -257,8 +256,8 @@
             "aggregation": "current",
             "alias": "Leaf 1 BGP Status",
             "colors": [
+              "#5794F2",
               "#73BF69",
-              "#F2CC0C",
               "#FA6400",
               "#C4162A"
             ],
@@ -280,21 +279,21 @@
             "overlayIcon": true,
             "pattern": "leaf1-eth1/1.0",
             "rangeData": [],
-            "reduce": true,
+            "reduce": false,
             "refId": "A",
             "sanitize": false,
             "shapeData": [
               {
                 "colorOn": "a",
                 "hidden": false,
-                "pattern": "146",
-                "style": "fillColor"
+                "pattern": "149",
+                "style": "strokeColor"
               }
             ],
             "shapeProp": "id",
             "shapeRegEx": true,
             "stringThresholds": [
-              "/yellow.*/",
+              "/up.*/",
               "/orange.*/",
               "/red.*/"
             ],
@@ -304,7 +303,7 @@
             "thresholds": [],
             "tooltip": true,
             "tooltipColors": true,
-            "tooltipLabel": "Leaf 1 BGP Status",
+            "tooltipLabel": "Leaf 1 Eth-1/1.0 BGP Status",
             "tooltipOn": "a",
             "tpDirection": "v",
             "tpGraph": false,
@@ -549,5 +548,5 @@
   "timezone": "",
   "title": "BGP Unnumbered",
   "uid": "ekg-_kBnk",
-  "version": 11
+  "version": 1
 }
