@@ -26,6 +26,7 @@ class PrefixManager:
         self.config = config      # Settings for this network instance
         self.oif_2_interface = {} # Map of oif to resolved interface name
         self.nhg_2_peer_nh_ips = {} # NHG name to (v4,v6) nexthop address(es)
+        self.interface_state = {} # Dynamic interface state
         self.unresolved_ecmp_groups = {} # ECMP routes, key=oif bitmask
         self.pending_routes = {} # Map of unresolved routes, per interface index
         self.stats = { 'ipv4': { 'value' : 0 }, 'ipv6': { 'value': 0 } }
@@ -42,6 +43,17 @@ class PrefixManager:
         logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
         telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=self.metadata)
         return telemetry_response
+
+    def Set_Interface_State(self,interface,oper_state):
+        ifstate = {
+         'last_updated': { 'value': datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ") },
+         'oper_state': { 'value': oper_state },
+        }
+        if oper_state=='up' and interface in self.interface_state:
+          ifstate.update( self.interface_state[interface] )
+
+        ifname = interface.replace('-','/').replace('e','ethernet-')
+        self.Add_Telemetry( f'.interface{{.name=="{ifname}"}}.bgp_unnumbered.status', ifstate )
 
     #
     # Registers an IPDB callback handler for route events in the given VRF instance
@@ -77,8 +89,12 @@ class PrefixManager:
               self.del_Route( msg )
            else:
               logging.info( f"netlink_callback: Ignoring BGP action {action}" )
+         elif action=='RTM_NEWLINK':
+           logging.debug( f"Link change event: {msg}" )
+           status = msg['attrs'][2][1] # IFLA_OPERSTATE
+           self.Set_Interface_State( msg['attrs'][0][1], 'up' if status=='UP' else 'down' )
          else:
-            logging.debug( f"netlink_callback: Ignoring {action}" )
+           logging.debug( f"netlink_callback: Ignoring {action}" )
 
       self.ipdb.register_callback(netlink_callback)
 
@@ -181,7 +197,17 @@ class PrefixManager:
     def del_Route( self, netlink_msg ):
         prefix = netlink_msg['attrs'][1][1] # RTA_DST
         length = netlink_msg['dst_len']
-        logging.info( f"del_Route {prefix}/{length}" )
+        if netlink_msg['attrs'][5][0] == 'RTA_OIF':
+          oif = netlink_msg['attrs'][5][1] # RTA_OIF, not correct upon link down
+        elif netlink_msg['attrs'][4][0] == 'RTA_MULTIPATH':
+          oif = netlink_msg['attrs'][4][1][0]['oif']
+        else:
+          logging.warning( f"Unable to determine 'oif': {netlink_msg}" )
+          oif = None
+        logging.info( f"del_Route {prefix}/{length} oif={oif} pending={self.pending_routes} msg={netlink_msg}" )
+        if oif in self.pending_routes:
+            self.pending_routes[oif] = [ (p,l) for p,l in self.pending_routes[oif] if p!=prefix and l!=length ]
+            logging.info( f"del_Route {prefix}/{length} pending_routes[{oif}]={self.pending_routes[oif]}" )
         return self.NDK_DeleteRoutes( routes=[(prefix,length)] )
 
     def NDK_DeleteRoutes( self, routes ):
@@ -240,13 +266,11 @@ class PrefixManager:
           'peer_as': { 'value': peer_as },
         }
         self.Add_Telemetry( f'.protocols.experimental_frr.peer{{.router_id=="{peer_id}"}}', peer_data )
-        peer_data.update( {
+        self.interface_state[interface] = {
           'discovered_peer_as': { 'value': peer_as },
           'router_id': { 'value': peer_id },
-          'oper_state': { 'value': 'up' },
-        } )
-        ifname = interface.replace('-','/').replace('e','ethernet-')
-        self.Add_Telemetry( f'.interface{{.name=="{ifname}"}}.bgp_unnumbered.status', peer_data )
+        }
+        self.Set_Interface_State( interface, 'up' )
 
         # Also update any ECMP groups that this interface belongs to
         for nhg_name in list(self.unresolved_ecmp_groups.keys()):
