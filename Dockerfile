@@ -26,7 +26,7 @@ ENV AGENT_PYTHONPATH="$VIRTUAL_ENV/lib/python3.6/site-packages:$AGENT_PYTHONPATH
 RUN sudo yum install -y https://ci1.netdef.org/artifact/LIBYANG-LIBYANGV2/shared/build-2/CentOS-8-x86_64-Packages/libyang2-2.0.0.10.g2eb910e4-1.el8.x86_64.rpm \
     https://ci1.netdef.org/artifact/RPKI-RTRLIB/shared/build-110/CentOS-7-x86_64-Packages/librtr-0.7.0-1.el7.centos.x86_64.rpm
 
-COPY frr/docker/centos-8/pkgs/x86_64/frr-8.?_git*.el8.x86_64.rpm /tmp/frr8.rpm
+COPY frr/docker/centos-8/pkgs/x86_64/frr-8.*_git*.el8.x86_64.rpm /tmp/frr8.rpm
 
 RUN sudo yum install -y /tmp/frr8.rpm \
     && sudo rm -rf /tmp/frr8.rpm
