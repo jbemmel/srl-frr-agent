@@ -68,10 +68,10 @@ subscriptions:
 
   srl_bgp-unnumbered:
     paths:
-      - /network-instance[name=*]/interface[name=ethernet-1/*]/
+      - /network-instance[name=*]/interface[name=ethernet-1/*]/bgp-unnumbered/
     mode: stream
     stream-mode: sample
-    sample-interval: 20s
+    sample-interval: 5s
     
 #  demo_docter-agent:
 #    paths:

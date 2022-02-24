@@ -25,6 +25,170 @@
   "panels": [
     {
       "datasource": "InfluxDB",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "interface_name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 119
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 59
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Discovered AS"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 182
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 9,
+        "x": 0,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "frameIndex": 0,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Time"
+          }
+        ]
+      },
+      "pluginVersion": "8.1.8",
+      "targets": [
+        {
+          "alias": "$tag_source",
+          "groupBy": [
+            {
+              "params": [
+                "interface_name"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "source"
+              ],
+              "type": "tag"
+            }
+          ],
+          "measurement": "srl_bgp-unnumbered",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "queryType": "randomWalk",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/oper-state"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": [
+                  "Status"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/discovered-peer-as"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": [
+                  "Discovered AS"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "tags": []
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "BGP Summary",
+      "type": "table"
+    },
+    {
+      "datasource": "InfluxDB",
       "flowchartsData": {
         "flowcharts": [
           {
@@ -43,7 +207,7 @@
             "tooltip": true,
             "type": "xml",
             "url": "http://<YourUrl>/<Your XML/drawio file/api>",
-            "xml": "<mxfile host=\"app.diagrams.net\" modified=\"2021-09-16T21:28:56.276Z\" agent=\"5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36 Edg/92.0.902.84\" etag=\"iP4MfMFBtHauyWHFxW7_\" version=\"15.2.9\" type=\"embed\"><diagram id=\"M2Kj8bjgcATGG53Vu1Hk\" name=\"Page-1\">7VpLj9sgEP41ObYyxq8c99keWqnSHtoeqc3adB0TEbJJ+usLNtgGO26SdR5dxZGiMAzD45sPhnEm8G62/sTQPPtKE5xPXCdZT+D9xHXDIBDfUrCpBF4wrQQpI0klAo3gifzBSugo6ZIkeGEockpzTuamMKZFgWNuyBBjdGWqPdPc7HWOUtwRPMUo70q/k4RnlTTynUb+GZM00z17jqr5heKXlNFlofqbuDAon6p6hrQtpb/IUEJXrU7hwwTeMUp59Wu2vsO5XFq9bFW7xy219bgZLvhODTxYNXlF+RLrMZcj4xu9GuV8sGwBJvB2lRGOn+YolrUrAb+QZXyWq+pnkud3NKesbAsfy0fIF5zRl3o1fSnRc5fNUoYSIgatmxa0wC3xPWECZ0ILUbWgS2lDWWz1JZ+yr+4qqIV5xYzjtb3cwosxnWHONkJF1bqeQkh5cKSKq8YdgAYxa7lCoGRIeWBaW25QED8UENtA8a6g9IHiOeCMoPhXUPpAgcA3QIG+d0pUgisqfajUK34eVMIrKn2o+C44JypRBwSciLhHFSnjGU1pgfKHRnprwtTofKF0roS/MecbFcShJacmdGK12OaHKDgfXV+Xf8qyLtyvjdJGlbpIRIGPfnVQD9uoV2aSGxkEyjkJD6wkjyTXI4rpjMRKlyOWYv4NMyLWEzPpgaRIReUHUHaEGLdslbKWNbwmvJqer0o/WzXN3GRBT22rKwkvZLEOQnVsVo3ROoYkcoMux3COOHk1I9o+/1FNv1EiBtNs6465gQiBaaIaqmrVDjEtQ65lCIaeaUhBYBsSy442LbW5VFjsMeDIGRwX9PwhffGjGkHDrXpxd6Tb9AC6HUCwC2WDuzsdDt4izM1p8YJ5nA3tHje3byRfcBry1fu98k0QHkg+ACPrwLEMbSHfIf6uTZ/teIHv/HwJ92RU3esIp054Gsf3LMevM0L7Or7vmLu75x7p1IHWgMPhU8e3JxiOfOr4GtNzsTB83yTc41jbkW/eGQ8aaF0TgX3R2JVvMLCyAEeK8jxo3qD0Sbk1+gTOkP4IfOvebK98u+RLVS/dTnWpgiPFdTC06BYdiW6BRbd/XKo858iXKh9e6XYhMeZb+HaicBJab3FAdCjfIotv0yPxbWryDXhgmG9T5036rkJim34AwJD+CHzuvup6mpMCd6NYjte8L/Fh5XbbmWIlQjlJZYo3Fo4qL0O3MmFLYpTfqIoZSZJyo+jLQjebh3T6Z9pkkwWdnfIzRIY9XjlGFpY6odVKDmt/bueGXcunD8oN+923WyUO3ejmMnEon3Fw8DxwRhy677O+YPT8v9DhXn7GgQFYN+X6RnESGLovsCQM/wsbRtyVoL/lYncSGKJeGLox4GXCMOKm5FuB+BFhEMXmD0jVmd78yQs+/AU=</diagram></mxfile>",
+            "xml": "<mxfile host=\"app.diagrams.net\" modified=\"2022-02-24T16:42:06.686Z\" agent=\"5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.56\" etag=\"0eqSIF_5OXyt8OCbqoFn\" version=\"16.6.3\" type=\"embed\"><diagram id=\"M2Kj8bjgcATGG53Vu1Hk\" name=\"Page-1\">7ZpNc9owEIZ/Dcd0bMufRxKa9pDOZIZD26NiC1uNsBghAvTXV7JlsCUnAWo7tGMzk6CVtZL1PhLLogm4W+6+MLjKvtEEkYljJbsJmE0cJwh98Vca9qXBC8LSkDKclCb7aJjj30gZLWXd4AStGzdySgnHq6YxpnmOYt6wQcbotnnbgpJmryuYIsMwjyExrd9xwrPSGnrW0f4V4TSrenYtVfME4+eU0U2u+ps4wC+usnoJK1/q/nUGE7qtdQo+T8Ado5SX7+jTL/l8jkXgk5hi5VO2JAgu7BvEM/tmOi8rxP+iqppi6+BwubtDRCh0XxbFG+W4UWthfZYYynl9vPevNXBB2eQFkg2qD3PN99WkFtOCZAt7Am63GeZovoKxrN0KioQt40uiqheYkDtKKCvagvviEvY1Z/T5IIonLdUUymYpgwkWg66a5jRHNfMMM/HUmOaiak030ofyWOtLXkVf5iyoiXlBjKOdrppYDIguEWd7cUtVWwm9bwK+PVLl+MqW1YkCyggVyenBtVOXUSnxmiruqEqbKu4Jqnhhb6p4oyptqgCrqQoIW2SxWxZLFHWhij+q0rqDfagowShKmyheoKtiD6lK+I4IlPGMpjSH5IHSlTL+QpzvVagHN5w2hRFzwfY/RMH65HhV+acsV4XZrlHaq5I5z6HvwSdD06CuaekmmcpQURSp4Ku03GNSjSimSxyrezlkKeKPiGExW4hJvnCeisobu+gIMq75Kmw1b2iHefl4nir9rNUcn00Wqkd7FRTBGIurULUKvcoxap8xKGkEuiZQDBHI8Usz7m2jQzV9pDjnr+/Zjv4JWQ5VtapHkJojR9/8A7fpSEmgOypgPTzPifxGBr8XEHuleDmn83Xxmmuu9vUz4nH21nKc3v4lzf4wNB9C8SouDC6k2QZhk2bP6o3mynVPuzH4z7fj4Mz1cui1g006GAZrV8P6EBmci7VneQ1HrtPfJu3ZvWId/N9Un/EpcCLA7gfuy0D/vu5fCDDwmwD3GWV4731VGQEeMkpu5XeoKBl0FFeAQOM37JFfMPI7SFjxNwAPFEEAVwM4vBTgUAM46hFgM/s9X+EcmYEFRzve9uVOS/fUk0fKBAlOZdYnFtrJkPBW5nBwDMlUVSxxkshuWhNTx/UkOVjQY4JJEG4Vr7f4OCOJp+nnmEk8tyVb5HSR7vbMdHchg/nxeJ0yFFc3MrjgA2Uw89sP8ifEf0SFmXx1o4IWTLpeNKAKZkJbqvCvrIUOtyTg200ZLDOF3Z8MYasMZsRznTJ0uCX5njWUDG1nGWZ4HVMxWvGojiXPMUxLt0elotrwlYxn6CNmy5kFfjFb2m8/vgUjO6gpRdCCt+jEZWz7jki2KdKiuJR9rkZc3acCZFsOK6MM/xY2WD1BMT2PdI3VL0oGQQ/aDQeSut8cQWTiELXg4J6Pg3YI5SI6fPOIy0jH23QYKLQAc/JxlmvHwx7xGBQPLb6NzPg2vCI6wEjHkHToR0munA53pGNQOqIPokMUj+dtyzzT8Uwz+PwH</diagram></mxfile>",
             "zoom": "100%"
           }
         ]
@@ -51,9 +215,9 @@
       "format": "short",
       "graphId": "flowchart_23763571993",
       "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
+        "h": 13,
+        "w": 15,
+        "x": 9,
         "y": 0
       },
       "id": 11,
@@ -62,12 +226,11 @@
         "rulesData": [
           {
             "aggregation": "current",
-            "alias": "Leaf 2 BGP",
+            "alias": "leaf1-eth1/2.0 status",
             "colors": [
               "#5794F2",
               "#73BF69",
-              "#FA6400",
-              "#C4162A"
+              "#F2495C"
             ],
             "column": "Time",
             "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -84,198 +247,6 @@
             "mappingType": 1,
             "metricType": "serie",
             "order": 1,
-            "overlayIcon": false,
-            "pattern": "leaf2-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "145",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/orange.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 2 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
-            "alias": "Leaf 2 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 2,
-            "overlayIcon": false,
-            "pattern": "leaf2-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "145",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/orange.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 2 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
-            "alias": "Leaf 3 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 3,
-            "overlayIcon": false,
-            "pattern": "leaf3-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "147",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/down.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 3 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
-            "alias": "Copy of Leaf 1 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 4,
             "overlayIcon": true,
             "pattern": "leaf1-eth1/2.0",
             "rangeData": [],
@@ -294,8 +265,7 @@
             "shapeRegEx": true,
             "stringThresholds": [
               "/up.*/",
-              "/orange.*/",
-              "/red.*/"
+              "/down.*/"
             ],
             "textData": [],
             "textProp": "value",
@@ -318,12 +288,11 @@
           },
           {
             "aggregation": "current",
-            "alias": "Leaf 1 BGP Status",
+            "alias": "leaf1-eth1/1.0 status",
             "colors": [
               "#5794F2",
               "#73BF69",
-              "#FA6400",
-              "#C4162A"
+              "#F2495C"
             ],
             "column": "Time",
             "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -339,7 +308,7 @@
             "linkRegEx": false,
             "mappingType": 1,
             "metricType": "serie",
-            "order": 5,
+            "order": 2,
             "overlayIcon": true,
             "pattern": "leaf1-eth1/1.0",
             "rangeData": [],
@@ -358,8 +327,7 @@
             "shapeRegEx": true,
             "stringThresholds": [
               "/up.*/",
-              "/orange.*/",
-              "/red.*/"
+              "/down.*/"
             ],
             "textData": [],
             "textProp": "value",
@@ -378,6 +346,72 @@
             "tpGraphType": "line",
             "type": "string",
             "unit": "short",
+            "valueData": []
+          },
+          {
+            "aggregation": "current",
+            "alias": "leaf1-eth1-AS",
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "column": "Time",
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "eventData": [],
+            "eventProp": "id",
+            "eventRegEx": false,
+            "gradient": false,
+            "hidden": false,
+            "invert": false,
+            "linkData": [],
+            "linkProp": "id",
+            "linkRegEx": true,
+            "mappingType": 1,
+            "metricType": "serie",
+            "order": 3,
+            "overlayIcon": false,
+            "pattern": "leaf1-eth1-AS",
+            "rangeData": [],
+            "reduce": true,
+            "refId": "A",
+            "sanitize": false,
+            "shapeData": [],
+            "shapeProp": "id",
+            "shapeRegEx": true,
+            "stringThresholds": [
+              "/.*/",
+              "/.*/"
+            ],
+            "textData": [
+              {
+                "hidden": false,
+                "pattern": "159",
+                "textOn": "wmd",
+                "textPattern": "/.*/",
+                "textReplace": "anl"
+              }
+            ],
+            "textProp": "id",
+            "textRegEx": true,
+            "thresholds": [
+              50,
+              80
+            ],
+            "tooltip": true,
+            "tooltipColors": false,
+            "tooltipLabel": "",
+            "tooltipOn": "a",
+            "tpDirection": "v",
+            "tpGraph": false,
+            "tpGraphHigh": null,
+            "tpGraphLow": null,
+            "tpGraphScale": "linear",
+            "tpGraphSize": "100%",
+            "tpGraphType": "line",
+            "type": "number",
+            "unit": "string",
             "valueData": []
           }
         ]
@@ -514,6 +548,39 @@
               "value": "clab-auto-frr-evpn-lab-leaf1"
             }
           ]
+        },
+        {
+          "alias": "leaf1-eth1-AS",
+          "groupBy": [],
+          "hide": false,
+          "measurement": "srl_bgp-unnumbered",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "D",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/discovered-peer-as"
+                ],
+                "type": "field"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "interface_name",
+              "operator": "=",
+              "value": "ethernet-1/1.0"
+            },
+            {
+              "condition": "AND",
+              "key": "source",
+              "operator": "=",
+              "value": "clab-auto-frr-evpn-lab-leaf1"
+            }
+          ]
         }
       ],
       "title": "Topology View",
@@ -521,113 +588,6 @@
       "type": "agenty-flowcharting-panel",
       "valueName": "current",
       "version": "0.9.0"
-    },
-    {
-      "datasource": "InfluxDB",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 10
-      },
-      "id": 7,
-      "options": {
-        "frameIndex": 0,
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "Time"
-          }
-        ]
-      },
-      "pluginVersion": "8.1.8",
-      "targets": [
-        {
-          "alias": "$tag_source",
-          "groupBy": [
-            {
-              "params": [
-                "interface_name"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
-                "source"
-              ],
-              "type": "tag"
-            }
-          ],
-          "measurement": "srl_bgp-unnumbered",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "queryType": "randomWalk",
-          "refId": "A",
-          "resultFormat": "table",
-          "select": [
-            [
-              {
-                "params": [
-                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/oper-state"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [
-                  "Status"
-                ],
-                "type": "alias"
-              }
-            ],
-            [
-              {
-                "params": [
-                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/discovered-peer-as"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [
-                  "Discovered AS"
-                ],
-                "type": "alias"
-              }
-            ]
-          ],
-          "tags": []
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "BGP Summary",
-      "type": "table"
     }
   ],
   "refresh": "5s",
