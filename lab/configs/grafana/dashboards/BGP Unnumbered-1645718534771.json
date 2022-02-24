@@ -213,7 +213,7 @@
         ]
       },
       "format": "short",
-      "graphId": "flowchart_11",
+      "graphId": "flowchart_23763571993",
       "gridPos": {
         "h": 13,
         "w": 15,
@@ -226,12 +226,11 @@
         "rulesData": [
           {
             "aggregation": "current",
-            "alias": "Leaf 2 BGP",
+            "alias": "leaf1-eth1/2.0 status",
             "colors": [
               "#5794F2",
               "#73BF69",
-              "#FA6400",
-              "#C4162A"
+              "#F2495C"
             ],
             "column": "Time",
             "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -248,202 +247,10 @@
             "mappingType": 1,
             "metricType": "serie",
             "order": 1,
-            "overlayIcon": false,
-            "pattern": "leaf2-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "145",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/orange.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 2 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
-            "alias": "Leaf 2 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 2,
-            "overlayIcon": false,
-            "pattern": "leaf2-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "145",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/orange.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 2 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
-            "alias": "Leaf 3 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 3,
-            "overlayIcon": false,
-            "pattern": "leaf3-eth1/1.0",
-            "rangeData": [],
-            "reduce": true,
-            "refId": "A",
-            "sanitize": false,
-            "shapeData": [
-              {
-                "colorOn": "a",
-                "hidden": false,
-                "pattern": "147",
-                "style": "fillColor"
-              }
-            ],
-            "shapeProp": "id",
-            "shapeRegEx": true,
-            "stringThresholds": [
-              "/up.*/",
-              "/down.*/",
-              "/red.*/"
-            ],
-            "textData": [],
-            "textProp": "value",
-            "textRegEx": true,
-            "thresholds": [],
-            "tooltip": true,
-            "tooltipColors": true,
-            "tooltipLabel": "Leaf 3 BGP Status",
-            "tooltipOn": "a",
-            "tpDirection": "v",
-            "tpGraph": false,
-            "tpGraphHigh": null,
-            "tpGraphLow": null,
-            "tpGraphScale": "linear",
-            "tpGraphSize": "100%",
-            "tpGraphType": "line",
-            "type": "string",
-            "unit": "short",
-            "valueData": []
-          },
-          {
-            "aggregation": "current",
-            "alias": "Copy of Leaf 1 BGP Status",
-            "colors": [
-              "#5794F2",
-              "#73BF69",
-              "#FA6400",
-              "#C4162A"
-            ],
-            "column": "Time",
-            "dateFormat": "YYYY-MM-DD HH:mm:ss",
-            "decimals": 2,
-            "eventData": [],
-            "eventProp": "id",
-            "eventRegEx": false,
-            "gradient": false,
-            "hidden": false,
-            "invert": true,
-            "linkData": [],
-            "linkProp": "id",
-            "linkRegEx": false,
-            "mappingType": 1,
-            "metricType": "serie",
-            "order": 4,
             "overlayIcon": true,
             "pattern": "leaf1-eth1/2.0",
             "rangeData": [],
-            "reduce": true,
+            "reduce": false,
             "refId": "A",
             "sanitize": false,
             "shapeData": [
@@ -458,8 +265,7 @@
             "shapeRegEx": true,
             "stringThresholds": [
               "/up.*/",
-              "/orange.*/",
-              "/red.*/"
+              "/down.*/"
             ],
             "textData": [],
             "textProp": "value",
@@ -482,12 +288,11 @@
           },
           {
             "aggregation": "current",
-            "alias": "Leaf 1 BGP Status",
+            "alias": "leaf1-eth1/1.0 status",
             "colors": [
               "#5794F2",
               "#73BF69",
-              "#FA6400",
-              "#C4162A"
+              "#F2495C"
             ],
             "column": "Time",
             "dateFormat": "YYYY-MM-DD HH:mm:ss",
@@ -503,7 +308,7 @@
             "linkRegEx": false,
             "mappingType": 1,
             "metricType": "serie",
-            "order": 5,
+            "order": 2,
             "overlayIcon": true,
             "pattern": "leaf1-eth1/1.0",
             "rangeData": [],
@@ -522,8 +327,7 @@
             "shapeRegEx": true,
             "stringThresholds": [
               "/up.*/",
-              "/orange.*/",
-              "/red.*/"
+              "/down.*/"
             ],
             "textData": [],
             "textProp": "value",
@@ -566,7 +370,7 @@
             "linkRegEx": true,
             "mappingType": 1,
             "metricType": "serie",
-            "order": 6,
+            "order": 3,
             "overlayIcon": false,
             "pattern": "leaf1-eth1-AS",
             "rangeData": [],
