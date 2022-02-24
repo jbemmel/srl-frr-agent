@@ -70,8 +70,8 @@ subscriptions:
     paths:
       - /network-instance[name=*]/interface[name=ethernet-1/*]/bgp-unnumbered/
     mode: stream
-    stream-mode: on_change
-    #sample-interval: 20s
+    stream-mode: sample
+    sample-interval: 5s
     
 #  demo_docter-agent:
 #    paths:
