@@ -247,7 +247,7 @@
             "mappingType": 1,
             "metricType": "serie",
             "order": 1,
-            "overlayIcon": true,
+            "overlayIcon": false,
             "pattern": "leaf1-eth1/2.0",
             "rangeData": [],
             "reduce": true,
@@ -309,7 +309,7 @@
             "mappingType": 1,
             "metricType": "serie",
             "order": 2,
-            "overlayIcon": true,
+            "overlayIcon": false,
             "pattern": "leaf1-eth1/1.0",
             "rangeData": [],
             "reduce": true,
@@ -350,7 +350,7 @@
           },
           {
             "aggregation": "current",
-            "alias": "leaf1-eth1-AS",
+            "alias": "leaf1-eth1/2.0-AS",
             "colors": [
               "rgba(245, 54, 54, 0.9)",
               "rgba(237, 129, 40, 0.89)",
@@ -372,7 +372,73 @@
             "metricType": "serie",
             "order": 3,
             "overlayIcon": false,
-            "pattern": "leaf1-eth1-AS",
+            "pattern": "leaf1-eth1/2.0-AS",
+            "rangeData": [],
+            "reduce": false,
+            "refId": "A",
+            "sanitize": false,
+            "shapeData": [],
+            "shapeProp": "id",
+            "shapeRegEx": true,
+            "stringThresholds": [
+              "/.*/",
+              "/.*/"
+            ],
+            "textData": [
+              {
+                "hidden": false,
+                "pattern": "160",
+                "textOn": "wmd",
+                "textPattern": "/.*/",
+                "textReplace": "anl"
+              }
+            ],
+            "textProp": "id",
+            "textRegEx": true,
+            "thresholds": [
+              50,
+              80
+            ],
+            "tooltip": true,
+            "tooltipColors": false,
+            "tooltipLabel": "",
+            "tooltipOn": "a",
+            "tpDirection": "v",
+            "tpGraph": false,
+            "tpGraphHigh": null,
+            "tpGraphLow": null,
+            "tpGraphScale": "linear",
+            "tpGraphSize": "100%",
+            "tpGraphType": "line",
+            "type": "number",
+            "unit": "string",
+            "valueData": []
+          },
+          {
+            "aggregation": "current",
+            "alias": "leaf1-eth1/1.0-AS",
+            "colors": [
+              "rgba(245, 54, 54, 0.9)",
+              "rgba(237, 129, 40, 0.89)",
+              "rgba(50, 172, 45, 0.97)"
+            ],
+            "column": "Time",
+            "dateFormat": "YYYY-MM-DD HH:mm:ss",
+            "decimals": 2,
+            "eventData": [],
+            "eventProp": "id",
+            "eventRegEx": false,
+            "gradient": false,
+            "hidden": false,
+            "invert": false,
+            "linkData": [],
+            "linkProp": "id",
+            "linkRegEx": true,
+            "mappingType": 1,
+            "metricType": "serie",
+            "order": 4,
+            "overlayIcon": false,
+            "pattern": "leaf1-eth1/1.0-AS",
             "rangeData": [],
             "reduce": true,
             "refId": "A",
@@ -550,7 +616,7 @@
           ]
         },
         {
-          "alias": "leaf1-eth1-AS",
+          "alias": "leaf1-eth1/1.0-AS",
           "groupBy": [],
           "hide": false,
           "measurement": "srl_bgp-unnumbered",
@@ -573,6 +639,39 @@
               "key": "interface_name",
               "operator": "=",
               "value": "ethernet-1/1.0"
+            },
+            {
+              "condition": "AND",
+              "key": "source",
+              "operator": "=",
+              "value": "clab-auto-frr-evpn-lab-leaf1"
+            }
+          ]
+        },
+        {
+          "alias": "leaf1-eth1/2.0-AS",
+          "groupBy": [],
+          "hide": false,
+          "measurement": "srl_bgp-unnumbered",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "E",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "/srl_nokia-network-instance:network-instance/interface/srl-frr-agent:bgp-unnumbered/status/discovered-peer-as"
+                ],
+                "type": "field"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "interface_name",
+              "operator": "=",
+              "value": "ethernet-1/2.0"
             },
             {
               "condition": "AND",
