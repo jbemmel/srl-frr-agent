@@ -10,7 +10,7 @@ ENV VIRTUAL_ENV=/opt/demo-agents/frr-agent/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # RUN sudo yum update --best --allowerasing && sudo yum install -y python3-pyroute2.noarch
-RUN sudo $VIRTUAL_ENV/bin/python3 -m pip install --upgrade pyroute2 pyroute2-ipdb
+RUN sudo $VIRTUAL_ENV/bin/python3 -m pip install --upgrade pyroute2 pyroute2-ipdb grpcio
 ENV AGENT_PYTHONPATH="$VIRTUAL_ENV/lib/python3.6/site-packages:$AGENT_PYTHONPATH"
 
 # Install FRR stable, enable BGP daemon

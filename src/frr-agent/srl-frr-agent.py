@@ -16,6 +16,8 @@ import subprocess
 # sys.path.append('/usr/lib/python3.6/site-packages/sdk_protos')
 from sdk_protos import sdk_service_pb2, sdk_service_pb2_grpc,config_service_pb2
 
+from grpc._channel import _InactiveRpcError
+
 # import sdk_common_pb2
 
 # To report state back
@@ -24,9 +26,9 @@ import telemetry_service_pb2,telemetry_service_pb2_grpc
 from pygnmi.client import gNMIclient
 
 # pygnmi does not support multithreading, so we need to build it
-from pygnmi.spec.gnmi_pb2_grpc import gNMIStub
-from pygnmi.spec.gnmi_pb2 import SetRequest, Update, TypedValue
-from pygnmi.path_generator import gnmi_path_generator
+from pygnmi.spec.v080.gnmi_pb2_grpc import gNMIStub
+from pygnmi.spec.v080.gnmi_pb2 import SetRequest, Update, TypedValue
+from pygnmi.create_gnmi_path import gnmi_path_generator
 
 from logging.handlers import RotatingFileHandler
 
@@ -180,7 +182,7 @@ class MonitoringThread(Thread):
             res = self.gnmi_stub.Set( update_request, metadata=gnmi_options )
             logging.info( f"After gnmi.Set {updates}: {res}" )
             return res
-      except grpc._channel._InactiveRpcError as err:
+      except _InactiveRpcError as err:
             logging.error(err)
             # May happen during system startup, retry once
             if err.code() == grpc.StatusCode.FAILED_PRECONDITION:
